@@ -64,6 +64,8 @@ create table profiles (
   phone text,
   email text,
   hourly_wage int default 10030,
+  wage_type text not null default 'hourly' check (wage_type in ('hourly','daily','monthly')),
+  deduction_type text not null default 'insurance' check (deduction_type in ('insurance','freelancer','none')),
   position text,
   hire_date date default current_date,
   active boolean not null default true,
