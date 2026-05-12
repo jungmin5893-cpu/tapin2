@@ -11,6 +11,7 @@ drop table if exists subscriptions cascade;
 drop table if exists payrolls cascade;
 drop table if exists employee_invites cascade;
 drop table if exists attendances cascade;
+drop table if exists shift_schedules cascade;
 drop table if exists employee_shifts cascade;
 drop table if exists shift_types cascade;
 drop table if exists profiles cascade;
@@ -21,6 +22,7 @@ drop function if exists set_jwt_claims(jsonb) cascade;
 drop function if exists bootstrap_owner(text,text,text) cascade;
 drop function if exists claim_employee_invite(text,text,text) cascade;
 drop function if exists check_in_or_out(uuid,text,numeric,numeric) cascade;
+drop function if exists copy_schedules_range(uuid,uuid,date,date,date,boolean) cascade;
 drop function if exists attendances_set_workday() cascade;
 drop function if exists resolve_shift(uuid,timestamptz) cascade;
 drop function if exists current_role_name() cascade;
@@ -99,6 +101,23 @@ create table employee_shifts (
   created_at timestamptz not null default now()
 );
 create index idx_emp_shifts_employee on employee_shifts(employee_id, weekday);
+
+-- 날짜별 시프트 스케줄 (캘린더형 시프트 관리, 0006_shift_schedules.sql 참조)
+create table shift_schedules (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  store_id uuid references stores(id) on delete cascade,
+  employee_id uuid not null references profiles(id) on delete cascade,
+  work_date date not null,
+  shift_type_id uuid references shift_types(id) on delete set null,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (employee_id, work_date)
+);
+create index idx_shift_schedules_tenant_date on shift_schedules(tenant_id, work_date);
+create index idx_shift_schedules_store_date  on shift_schedules(store_id, work_date);
+create index idx_shift_schedules_emp_date    on shift_schedules(employee_id, work_date);
 
 create table attendances (
   id uuid primary key default gen_random_uuid(),
@@ -250,6 +269,13 @@ create policy "emp_shifts_owner_all" on employee_shifts for all
   using (tenant_id = current_tenant_id() and current_role_name() = 'owner')
   with check (tenant_id = current_tenant_id() and current_role_name() = 'owner');
 
+alter table shift_schedules enable row level security;
+create policy "shift_schedules_select" on shift_schedules for select
+  using (tenant_id = current_tenant_id());
+create policy "shift_schedules_owner_all" on shift_schedules for all
+  using (tenant_id = current_tenant_id() and current_role_name() = 'owner')
+  with check (tenant_id = current_tenant_id() and current_role_name() = 'owner');
+
 alter table attendances enable row level security;
 create policy "att_owner_all" on attendances for all
   using (tenant_id = current_tenant_id() and current_role_name() = 'owner')
@@ -289,7 +315,7 @@ create policy "requests_employee_own" on requests for all
 
 -- ⑥ 핵심 함수 -------------------------------------------------
 
--- 시프트 해상도
+-- 시프트 해상도: shift_schedules(날짜별) 우선, employee_shifts(요일 폴백)
 create or replace function resolve_shift(p_emp uuid, p_ts timestamptz)
 returns table(shift_type_id uuid, workday date)
 language plpgsql stable as $$
@@ -299,6 +325,34 @@ declare
   v_yday date  := v_today - 1;
   v_time time  := v_local::time;
 begin
+  -- (1A) 어제 날짜 배정의 야간 시프트
+  return query
+  select st.id, v_yday
+    from shift_schedules ss
+    join shift_types st on st.id = ss.shift_type_id
+   where ss.employee_id = p_emp
+     and ss.work_date = v_yday
+     and st.is_overnight
+     and v_local >= ((v_yday::timestamp) + st.start_time)
+     and v_local <  ((v_today::timestamp) + st.end_time)
+   limit 1;
+  if found then return; end if;
+
+  -- (1B) 오늘 날짜 배정
+  return query
+  select st.id, v_today
+    from shift_schedules ss
+    join shift_types st on st.id = ss.shift_type_id
+   where ss.employee_id = p_emp
+     and ss.work_date = v_today
+     and (
+       (not st.is_overnight and v_time >= st.start_time and v_time < st.end_time)
+       or (st.is_overnight and v_time >= st.start_time)
+     )
+   limit 1;
+  if found then return; end if;
+
+  -- (2A) 폴백: 어제 요일 야간
   return query
   select st.id, v_yday
     from employee_shifts es
@@ -314,6 +368,7 @@ begin
    limit 1;
   if found then return; end if;
 
+  -- (2B) 폴백: 오늘 요일
   return query
   select st.id, v_today
     from employee_shifts es
@@ -399,6 +454,35 @@ begin
 end $$;
 revoke all on function check_in_or_out(uuid,text,numeric,numeric) from public;
 grant execute on function check_in_or_out(uuid,text,numeric,numeric) to authenticated;
+
+-- 시프트 스케줄 기간 복사 (이전 주 → 다음 주 등)
+create or replace function copy_schedules_range(
+  p_tenant uuid, p_store uuid,
+  p_src_start date, p_src_end date,
+  p_dst_start date, p_replace boolean default true
+) returns int
+language plpgsql security definer
+set search_path = public as $$
+declare v_offset int := p_dst_start - p_src_start; v_count int;
+begin
+  if v_offset = 0 then return 0; end if;
+  if p_replace then
+    delete from shift_schedules
+     where tenant_id = p_tenant
+       and (p_store is null or store_id = p_store)
+       and work_date between p_dst_start and (p_src_end + v_offset);
+  end if;
+  insert into shift_schedules(tenant_id, store_id, employee_id, work_date, shift_type_id, note)
+  select tenant_id, store_id, employee_id, work_date + v_offset, shift_type_id, note
+    from shift_schedules
+   where tenant_id = p_tenant
+     and (p_store is null or store_id = p_store)
+     and work_date between p_src_start and p_src_end
+  on conflict (employee_id, work_date) do update set shift_type_id = excluded.shift_type_id;
+  get diagnostics v_count = row_count;
+  return v_count;
+end $$;
+grant execute on function copy_schedules_range(uuid,uuid,date,date,date,boolean) to authenticated;
 
 -- 직원 초대 코드 검증 + 프로필 생성
 create or replace function claim_employee_invite(p_phone text, p_code text, p_name text)
