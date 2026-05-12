@@ -9,6 +9,8 @@ const panels = {
   role: $('#panel-role'),
   ownerLogin: $('#panel-owner-login'),
   ownerSignup: $('#panel-owner-signup'),
+  forgotPw: $('#panel-forgot-pw'),
+  resetPw: $('#panel-reset-pw'),
   employeeLogin: $('#panel-emp-login'),
   employeeSignup: $('#panel-emp-signup'),
 };
@@ -111,14 +113,87 @@ bindPwStrength({
   confirmId: '#emp-pw-confirm', matchId: '#emp-pw-match', minLen: 6,
 });
 
+// ── 이메일 재설정 링크 클릭 후 복귀 처리 ──────────
+async function checkAuthCallback() {
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  const type = hash.get('type');
+  if (type === 'recovery') {
+    // 비밀번호 재설정 링크로 접속한 경우
+    showPanel('resetPw');
+    return true;
+  }
+  if (type === 'signup') {
+    toast('이메일 인증이 완료됐습니다. 로그인해주세요.', 'success', 4000);
+    showPanel('ownerLogin');
+    return true;
+  }
+  return false;
+}
+
+// 비밀번호 재설정 강도
+bindPwStrength({
+  pwId: '#reset-pw', fillId: '#reset-pw-strength-fill', labelId: '#reset-pw-strength-label',
+  confirmId: '#reset-pw-confirm', matchId: '#reset-pw-match', minLen: 8,
+});
+
 // ── 이미 로그인된 경우 역할 페이지로 보내기 ──────────
 async function redirectIfLoggedIn() {
+  const handled = await checkAuthCallback();
+  if (handled) return;
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return;
   const profile = await getMyProfile();
   if (profile?.role) location.href = routeForRole(profile.role);
 }
 redirectIfLoggedIn();
+
+// ── 비밀번호 찾기 링크 ────────────────────────────
+$('#link-forgot-pw')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  showPanel('forgotPw');
+});
+
+// ── 비밀번호 재설정 요청 ──────────────────────────
+$('#form-forgot-pw')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '전송 중…';
+  try {
+    const email = $('#forgot-email').value.trim();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${location.origin}${location.pathname.replace(/[^/]*$/, '')}login.html`,
+    });
+    if (error) throw error;
+    toast('재설정 링크를 이메일로 보냈습니다. 메일함을 확인해주세요.', 'success', 5000);
+    showPanel('ownerLogin');
+  } catch (err) {
+    toast(humanError(err), 'error');
+    btn.disabled = false; btn.textContent = orig;
+  }
+});
+
+// ── 비밀번호 재설정 (링크 클릭 후) ──────────────
+$('#form-reset-pw')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '변경 중…';
+  try {
+    const pw = $('#reset-pw').value;
+    const confirm = $('#reset-pw-confirm').value;
+    if (pw.length < 8) throw new Error('비밀번호는 8자 이상이어야 합니다');
+    if (pw !== confirm) throw new Error('비밀번호가 일치하지 않습니다');
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    if (error) throw error;
+    toast('비밀번호가 변경됐습니다. 로그인해주세요.', 'success', 4000);
+    await supabase.auth.signOut();
+    showPanel('ownerLogin');
+  } catch (err) {
+    toast(humanError(err), 'error');
+    btn.disabled = false; btn.textContent = orig;
+  }
+});
 
 // ── 역할 선택 ──────────────────────────────────────
 $$('#panel-role .role-btn').forEach(btn => {

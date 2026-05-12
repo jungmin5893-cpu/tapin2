@@ -2,6 +2,8 @@ import { supabase } from '../../lib/supabase.js';
 import { requireRole, signOut, getMyProfile } from '../../lib/auth.js';
 import { kst, fmt, fmtDate, fmtTime, minutesToHm, diffMinutes, nowKst } from '../../lib/time.js';
 import { toast } from '../../lib/toast.js';
+import { initOfflineBar, getGpsPosition, gpsDistance } from '../../lib/network.js';
+import { subscribePush } from '../../lib/push.js';
 import QrScanner from 'qr-scanner';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -24,6 +26,7 @@ async function init() {
   $('#profile-phone').textContent = profile.phone || '-';
   $('#profile-position').textContent = profile.position || '직원';
 
+  initOfflineBar();
   bindUI();
   await refreshAll();
   startClock();
@@ -244,13 +247,36 @@ async function handleQrPayload(raw) {
   }
   stopScan();
 
-  // GPS 옵션
+  // GPS 취득 + 매장 반경 검증
   let lat = null, lng = null;
   try {
-    const pos = await new Promise((resolve, reject) =>
-      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000 }));
-    lat = pos.coords.latitude; lng = pos.coords.longitude;
-  } catch { /* 옵션 — 무시 */ }
+    const pos = await getGpsPosition(5000);
+    lat = pos.lat; lng = pos.lng;
+
+    // 매장 GPS 설정 조회 후 반경 체크
+    const { data: storeData } = await supabase
+      .from('stores')
+      .select('gps_lat, gps_lng, gps_radius_m, name')
+      .eq('id', parsed.store)
+      .maybeSingle();
+
+    if (storeData?.gps_lat && storeData?.gps_lng) {
+      const dist = gpsDistance(lat, lng, storeData.gps_lat, storeData.gps_lng);
+      const radius = storeData.gps_radius_m || 100;
+      if (dist > radius) {
+        const ok = confirm(
+          `📍 현재 위치가 매장(${storeData.name || ''})에서 약 ${Math.round(dist)}m 떨어져 있습니다.\n` +
+          `허용 반경: ${radius}m\n\n그래도 출퇴근 처리할까요?`
+        );
+        if (!ok) return;
+      }
+    }
+  } catch (gpsErr) {
+    // GPS 권한 거부나 타임아웃 — 경고만 표시하고 계속 진행
+    if (gpsErr.code === 1 /* PERMISSION_DENIED */) {
+      toast('GPS 권한이 없어 위치 인증을 건너뜁니다', 'warn', 3000);
+    }
+  }
 
   const { data, error } = await supabase.rpc('check_in_or_out', {
     p_store: parsed.store,
@@ -264,6 +290,7 @@ async function handleQrPayload(raw) {
       TENANT_MISMATCH: '소속 매장의 QR이 아닙니다',
       EMPLOYEE_INACTIVE: '비활성 직원입니다',
       AUTH_REQUIRED: '로그인이 필요합니다',
+      GPS_OUT_OF_RANGE: '매장 반경 밖입니다. 매장 안에서 다시 시도해주세요',
     };
     const code = error.message.match(/[A-Z_]+/g)?.[0];
     toast(map[code] || error.message, 'error');
@@ -272,6 +299,37 @@ async function handleQrPayload(raw) {
 
   showSuccess(data);
   await refreshAll();
+
+  // 첫 체크인 시 푸시 구독 요청 (한 번만)
+  if (data.action === 'check_in' && !sessionStorage.getItem('push_asked')) {
+    sessionStorage.setItem('push_asked', '1');
+    if ('Notification' in window && Notification.permission === 'default') {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        await subscribePush(profile.id, profile.tenant_id);
+      }
+    } else if (Notification.permission === 'granted') {
+      await subscribePush(profile.id, profile.tenant_id);
+    }
+  }
+
+  // 사장님에게 푸시 알림 전송
+  await notifyOwner(data);
+}
+
+async function notifyOwner(data) {
+  try {
+    const action = data.action === 'check_in' ? '출근' : '퇴근';
+    const time = new Date(data.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    await supabase.functions.invoke('send-push', {
+      body: {
+        employee_id: profile.id,
+        title: `${profile.name} ${action} 완료`,
+        message: `${time} ${action} 처리됐습니다`,
+        data: { action: data.action, employee_id: profile.id },
+      },
+    });
+  } catch { /* 푸시 실패는 무시 */ }
 }
 
 function showSuccess(data) {

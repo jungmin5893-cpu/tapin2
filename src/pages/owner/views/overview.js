@@ -1,5 +1,6 @@
 import { supabase } from '../../../lib/supabase.js';
 import { nowKst, fmtDate, kst, minutesToHm, diffMinutes } from '../../../lib/time.js';
+import { subscribePush, isPushSubscribed } from '../../../lib/push.js';
 
 export async function renderOverview({ root, profile }) {
   root.innerHTML = `
@@ -28,6 +29,7 @@ export async function renderOverview({ root, profile }) {
 
   await loadKpi(root, profile);
   await loadRecent(root, profile);
+  setupPushBanner(root, profile);
 
   const channel = supabase.channel('owner-att')
     .on('postgres_changes', {
@@ -36,6 +38,36 @@ export async function renderOverview({ root, profile }) {
     }, () => { loadKpi(root, profile); loadRecent(root, profile); })
     .subscribe();
   root._teardown = () => supabase.removeChannel(channel);
+}
+
+async function setupPushBanner(root, profile) {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  const already = await isPushSubscribed();
+  if (already || Notification.permission === 'denied') return;
+
+  // 배너 삽입 (페이지 상단)
+  const banner = document.createElement('div');
+  banner.id = 'push-banner';
+  banner.style.cssText = 'background:linear-gradient(90deg,#1e3a5f,#243650);color:#fff;padding:12px 20px;border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;font-size:14px;';
+  banner.innerHTML = `
+    <span>🔔 직원 출퇴근 시 알림을 받으시겠어요?</span>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <button id="push-allow" style="padding:7px 16px;background:#00c9a7;color:#0f1b2d;border:none;border-radius:7px;font-weight:800;cursor:pointer;font-size:13px">허용</button>
+      <button id="push-deny" style="padding:7px 12px;background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px">나중에</button>
+    </div>`;
+  root.prepend(banner);
+
+  root.querySelector('#push-allow').addEventListener('click', async () => {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      await subscribePush(profile.id, profile.tenant_id);
+      banner.innerHTML = '✅ 알림이 활성화됐습니다.';
+      setTimeout(() => banner.remove(), 2500);
+    } else {
+      banner.remove();
+    }
+  });
+  root.querySelector('#push-deny').addEventListener('click', () => banner.remove());
 }
 
 async function loadKpi(root, profile) {

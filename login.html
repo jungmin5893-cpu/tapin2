@@ -158,6 +158,48 @@ body{
         <button type="submit" class="btn green">로그인</button>
       </form>
       <div class="foot-link">처음이신가요? <a data-go="ownerSignup">30일 무료체험 시작 →</a></div>
+      <div class="foot-link" style="margin-top:8px"><a id="link-forgot-pw" href="#">비밀번호를 잊으셨나요?</a></div>
+    </div>
+
+    <!-- 비밀번호 재설정 요청 -->
+    <div class="panel" id="panel-forgot-pw">
+      <button class="btn-back" data-go="ownerLogin" type="button">‹ 로그인으로</button>
+      <div class="panel-title">비밀번호 재설정</div>
+      <div class="panel-sub">가입한 이메일을 입력하면 재설정 링크를 보내드립니다</div>
+      <form id="form-forgot-pw">
+        <div class="form-group">
+          <label>이메일</label>
+          <input type="email" id="forgot-email" required autocomplete="email" placeholder="boss@example.com">
+        </div>
+        <button type="submit" class="btn green">재설정 링크 전송</button>
+      </form>
+      <div class="foot-link" style="margin-top:16px"><a data-go="ownerLogin">로그인으로 돌아가기</a></div>
+    </div>
+
+    <!-- 비밀번호 재설정 (이메일 링크 클릭 후) -->
+    <div class="panel" id="panel-reset-pw">
+      <div class="panel-title">새 비밀번호 설정</div>
+      <div class="panel-sub">새 비밀번호를 입력해주세요 (8자 이상)</div>
+      <form id="form-reset-pw">
+        <div class="form-group">
+          <label>새 비밀번호</label>
+          <div class="pw-wrap">
+            <input type="password" id="reset-pw" required minlength="8" autocomplete="new-password" placeholder="새 비밀번호">
+            <button type="button" class="pw-eye" aria-label="비밀번호 보기">👁</button>
+          </div>
+          <div class="pw-strength-bar"><div class="pw-strength-fill" id="reset-pw-strength-fill"></div></div>
+          <div class="pw-strength-label" id="reset-pw-strength-label"></div>
+        </div>
+        <div class="form-group">
+          <label>비밀번호 확인</label>
+          <div class="pw-wrap pw-match-wrap">
+            <input type="password" id="reset-pw-confirm" required autocomplete="new-password" placeholder="비밀번호 재입력">
+            <span class="pw-match-status" id="reset-pw-match"></span>
+            <button type="button" class="pw-eye" aria-label="비밀번호 보기">👁</button>
+          </div>
+        </div>
+        <button type="submit" class="btn green">비밀번호 변경</button>
+      </form>
     </div>
 
     <!-- 사장 회원가입 -->
@@ -204,6 +246,12 @@ body{
             <span class="pw-match-status" id="owner-pw-match"></span>
             <button type="button" class="pw-eye" aria-label="비밀번호 보기">👁</button>
           </div>
+        </div>
+        <div class="form-group" style="margin-top:4px">
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-weight:400;font-size:13px;color:var(--gray4)">
+            <input type="checkbox" id="agree-terms" required style="margin-top:2px;width:16px;height:16px;accent-color:var(--primary);flex-shrink:0;">
+            <span><a href="terms.html" target="_blank" style="color:var(--primary);font-weight:700">이용약관</a> 및 <a href="privacy.html" target="_blank" style="color:var(--primary);font-weight:700">개인정보처리방침</a>에 동의합니다 (필수)</span>
+          </label>
         </div>
         <button type="submit" class="btn green">무료체험 시작 →</button>
       </form>
