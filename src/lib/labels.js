@@ -74,20 +74,28 @@ export function calcMonthlyFee(employeeCount) {
 
 /**
  * 기능 접근 권한 체크
- * - trialing: 모든 기능 오픈
  * - active: 모든 기능 오픈
- * - 만료 or 무료: 출퇴근 관리만
+ * - trialing (유효): 모든 기능 오픈
+ * - 5인 이하: 무료 플랜 — 모든 기능 오픈
+ * - 만료/초과: 출퇴근 관리만
  */
 export function canAccess(tenant, feature) {
   if (!tenant) return feature === 'attendance';
+  // 5인 이하: 무료 플랜 전 기능 제공
+  if ((tenant.peak_employee_count || 0) <= 5) return true;
   const { subscription_status, trial_ends_at } = tenant;
   if (subscription_status === 'active') return true;
   if (subscription_status === 'trialing') {
     if (!trial_ends_at) return true;
     return new Date(trial_ends_at) > new Date();
   }
-  // 무료/만료: 출퇴근만
   return feature === 'attendance';
+}
+
+export function isFreePlan(tenant) {
+  if (!tenant) return false;
+  if (tenant.subscription_status === 'active') return false;
+  return (tenant.peak_employee_count || 0) <= 5;
 }
 
 // 유료 전용 기능 목록

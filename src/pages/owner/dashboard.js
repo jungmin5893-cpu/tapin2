@@ -2,7 +2,7 @@ import { supabase } from '../../lib/supabase.js';
 import { requireRole, signOut } from '../../lib/auth.js';
 import { toast } from '../../lib/toast.js';
 import { initOfflineBar } from '../../lib/network.js';
-import { getLabels, canAccess, PAID_FEATURES } from '../../lib/labels.js';
+import { getLabels, canAccess, isFreePlan, PAID_FEATURES } from '../../lib/labels.js';
 import { renderOverview } from './views/overview.js';
 import { renderAttendance } from './views/attendance.js';
 import { renderEmployees } from './views/employees.js';
@@ -79,6 +79,8 @@ async function init() {
 function isExpired(t) {
   if (!t) return false;
   if (t.subscription_status === 'active') return false;
+  // 5인 이하 무료 플랜은 만료 없음
+  if (isFreePlan(t)) return false;
   if (t.subscription_status === 'trialing') {
     return t.trial_ends_at && new Date(t.trial_ends_at) < new Date();
   }
@@ -146,13 +148,16 @@ function showExpiredModal() {
 
 function showTrialBadge(t) {
   if (!t) return;
-  if (t.subscription_status === 'trialing') {
+  if (t.subscription_status === 'active') {
+    $('#trial-badge').textContent = `${t.plan?.toUpperCase() || 'PRO'} 구독중`;
+    $('#trial-badge').classList.add('active', 'paid');
+  } else if (isFreePlan(t)) {
+    $('#trial-badge').textContent = '무료 플랜 (5인 이하)';
+    $('#trial-badge').classList.add('active', 'free');
+  } else if (t.subscription_status === 'trialing') {
     const remain = Math.max(0, Math.ceil((new Date(t.trial_ends_at) - Date.now()) / 86400000));
     $('#trial-badge').textContent = `무료체험 D-${remain}`;
     $('#trial-badge').classList.add('active');
-  } else if (t.subscription_status === 'active') {
-    $('#trial-badge').textContent = `${t.plan?.toUpperCase() || 'PRO'} 구독중`;
-    $('#trial-badge').classList.add('active', 'paid');
   } else {
     $('#trial-badge').textContent = '구독 만료';
     $('#trial-badge').classList.add('active', 'expired');
