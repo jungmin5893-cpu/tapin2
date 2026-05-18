@@ -100,12 +100,13 @@ export function isFreePlan(tenant) {
 
 // 유료 전용 기능 목록
 export const PAID_FEATURES = {
-  employees: '직원 관리',
-  stores: '현장 / QR',
-  shifts: '시프트 관리',
-  payroll: '급여 정산',
-  leaves: '연차·휴가 관리',
-  settings: '설정',
+  employees:  '직원 관리',
+  stores:     '현장 / QR',
+  shifts:     '시프트 관리',
+  payroll:    '급여 정산',
+  leaves:     '연차·휴가 관리',
+  contracts:  '전자근로계약서',
+  settings:   '설정',
 };
 
 export const FREE_FEATURES = ['attendance', 'overview'];

@@ -311,6 +311,22 @@ select.cell-edit{cursor:pointer;}
   .kpi-card .kpi-val{font-size:22px;}
   .page-head h1{font-size:16px;}
 }
+
+/* ── 인쇄 (전자계약서 출력) ── */
+@media print {
+  .sidebar,.sidebar-backdrop,.topbar,.nav-list,.side-foot,
+  .page-head,.filter-bar,#btn-new-contract,[data-preview],[data-edit],[data-send],[data-recall],
+  #modal-close,#preview-close,#btn-print,button{display:none!important;}
+  #printable-contract{display:block!important;font-size:13px;}
+  body,html{background:#fff!important;}
+  .pay-modal,.pay-modal-backdrop{display:none!important;}
+}
+
+/* ── 주52시간 배지 ── */
+.h52-badge{display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;}
+.h52-ok{background:#d1fae5;color:#059669;}
+.h52-warn{background:#fef3c7;color:#d97706;}
+.h52-over{background:#fee2e2;color:#dc2626;}
 </style>
 </head>
 <body>
@@ -333,6 +349,7 @@ select.cell-edit{cursor:pointer;}
     <button class="nav-item" data-route="shifts" data-feature="shifts"><span class="ic">○</span>시프트</button>
     <button class="nav-item" data-route="payroll" data-feature="payroll"><span class="ic">○</span>급여</button>
     <button class="nav-item" data-route="leaves" data-feature="leaves"><span class="ic">○</span>연차·휴가</button>
+    <button class="nav-item" data-route="contracts" data-feature="contracts"><span class="ic">○</span>전자계약서</button>
     <div class="nav-section">시스템</div>
     <button class="nav-item" data-route="settings" data-feature="settings"><span class="ic">○</span>설정</button>
     <button class="nav-item" id="nav-superadmin" data-route="superadmin" style="display:none"><span class="ic">⚙</span>어드민 패널</button>

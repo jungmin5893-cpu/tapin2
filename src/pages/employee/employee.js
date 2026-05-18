@@ -59,9 +59,10 @@ function bindUI() {
       const tab = btn.dataset.tab;
       $$('.tab-item').forEach(b => b.classList.toggle('active', b === btn));
       $$('.page-view').forEach(p => p.classList.toggle('active', p.id === `page-${tab}`));
-      if (tab === 'history') loadHistory();
-      if (tab === 'salary') loadSalary();
-      if (tab === 'leave') loadLeave();
+      if (tab === 'history')   loadHistory();
+      if (tab === 'salary')    loadSalary();
+      if (tab === 'leave')     loadLeave();
+      if (tab === 'contracts') loadContracts();
     });
   });
 
@@ -75,6 +76,14 @@ function bindUI() {
   $('#leave-start').addEventListener('change', () => {
     const end = $('#leave-end');
     if (!end.value || end.value < $('#leave-start').value) end.value = $('#leave-start').value;
+  });
+
+  // 계약서 모달 닫기
+  $('#contract-detail-close').addEventListener('click', () => {
+    $('#contract-detail-modal').classList.remove('active');
+  });
+  $('#contract-detail-modal').addEventListener('click', e => {
+    if (e.target === $('#contract-detail-modal')) $('#contract-detail-modal').classList.remove('active');
   });
 
   // 로그아웃
@@ -499,6 +508,139 @@ async function loadLeave() {
       await loadLeave();
     });
   });
+}
+
+async function loadContracts() {
+  const list = $('#contracts-list');
+  if (!list) return;
+  list.innerHTML = '<div class="record-item" style="color:#8a94a6;justify-content:center;font-size:13px;">불러오는 중…</div>';
+
+  const { data, error } = await supabase
+    .from('labor_contracts')
+    .select('id, contract_type, start_date, end_date, wage_type, wage_amount, status, owner_signed_at, employee_signed_at, created_at')
+    .eq('employee_id', profile.id)
+    .in('status', ['sent', 'completed'])
+    .order('created_at', { ascending: false });
+
+  if (error) { list.innerHTML = `<div class="record-item" style="color:#f04438;font-size:13px;">${error.message}</div>`; return; }
+  if (!data?.length) {
+    list.innerHTML = '<div class="record-item" style="color:#8a94a6;justify-content:center;font-size:13px;">발급된 계약서가 없습니다</div>';
+    return;
+  }
+
+  const typeLabel = { regular: '정규직', fixed: '계약직', parttime: '단시간' };
+  const wageLabel = { hourly: '시급', daily: '일급', monthly: '월급' };
+  list.innerHTML = data.map(r => {
+    const period = r.end_date ? `${r.start_date} ~ ${r.end_date}` : `${r.start_date}~`;
+    const badgeClass = r.status === 'completed' ? 'completed' : 'sent';
+    const badgeText  = r.status === 'completed' ? '서명 완료' : '서명 필요';
+    return `
+      <div class="contract-item" data-id="${r.id}" style="cursor:pointer">
+        <div class="contract-info">
+          <div class="c-title">${typeLabel[r.contract_type] || r.contract_type} 근로계약서</div>
+          <div class="c-sub">${period} · ${wageLabel[r.wage_type] || ''} ${Number(r.wage_amount).toLocaleString()}원</div>
+          <div class="c-sub" style="margin-top:4px;font-size:11px">
+            사장 서명: ${r.owner_signed_at ? '✅' : '⏳'} &nbsp;|&nbsp;
+            직원 서명: ${r.employee_signed_at ? '✅' : '⏳'}
+          </div>
+        </div>
+        <span class="contract-badge ${badgeClass}">${badgeText}</span>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-id]').forEach(el => {
+    el.addEventListener('click', () => openContractDetail(el.dataset.id));
+  });
+}
+
+async function openContractDetail(id) {
+  const { data: c, error } = await supabase
+    .from('labor_contracts')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error || !c) { toast('계약서를 불러올 수 없습니다', 'error'); return; }
+
+  const wageLabel = { hourly: '시급', daily: '일급', monthly: '월급' };
+  const wageUnit  = { hourly: '원/시간', daily: '원/일', monthly: '원/월' };
+  const dedLabel  = { insurance: '4대보험 (~9.4%)', freelancer: '프리랜서 3.3%', none: '공제 없음' };
+  const typeLabel = { regular: '정규직 (기간 정함 없음)', fixed: '계약직 (기간제)', parttime: '단시간 근로자' };
+  const period    = c.end_date ? `${c.start_date} ~ ${c.end_date}` : `${c.start_date}부터 (기간 정함 없음)`;
+
+  const row = (label, value) =>
+    `<div class="contract-row"><span>${label}</span><span>${value}</span></div>`;
+
+  const canSign = c.status === 'sent' && !c.employee_signed_at;
+
+  $('#contract-detail-body').innerHTML = `
+    <div class="contract-section">
+      <h4>계약 정보</h4>
+      ${row('계약 유형', typeLabel[c.contract_type] || c.contract_type)}
+      ${row('계약 기간', period)}
+      ${row('취업 장소', c.work_location || '-')}
+      ${row('담당 업무', c.job_description || '-')}
+    </div>
+    <div class="contract-section">
+      <h4>근로시간</h4>
+      ${row('소정근로일', c.work_days)}
+      ${row('근무시간', `${c.daily_start} ~ ${c.daily_end}`)}
+      ${row('휴게시간', `${c.break_minutes}분`)}
+      ${row('주간 소정근로', `${c.weekly_hours}시간`)}
+    </div>
+    <div class="contract-section">
+      <h4>임금</h4>
+      ${row('임금 종류', wageLabel[c.wage_type] || c.wage_type)}
+      ${row('금액', `${Number(c.wage_amount).toLocaleString()}${wageUnit[c.wage_type] || '원'}`)}
+      ${row('지급일', `매월 ${c.pay_day}일`)}
+      ${row('지급 방법', c.pay_method)}
+      ${row('공제 방식', dedLabel[c.deduction_type] || c.deduction_type)}
+    </div>
+    <div class="contract-section">
+      <h4>휴가</h4>
+      ${row('연차유급휴가', `${c.annual_leave_days}일`)}
+    </div>
+    <div class="sign-section">
+      <div class="sign-box">
+        <div class="s-label">사용자 서명</div>
+        <div class="s-name">${c.owner_name || '-'} (인)</div>
+        <div class="s-date">${c.owner_signed_at ? new Date(c.owner_signed_at).toLocaleDateString('ko-KR') : '미서명'}</div>
+      </div>
+      <div class="sign-box">
+        <div class="s-label">근로자 서명</div>
+        <div class="s-name">${profile.name} (인)</div>
+        <div class="s-date">${c.employee_signed_at ? new Date(c.employee_signed_at).toLocaleDateString('ko-KR') + ' 서명 완료' : '아직 서명하지 않았습니다'}</div>
+      </div>
+      ${canSign ? `
+        <p style="font-size:12px;color:#64748b;line-height:1.7;margin-bottom:12px">
+          위 근로계약서 내용을 충분히 확인하였으며, 이에 동의하고 서명합니다.<br>
+          본 전자서명은 전자문서 및 전자거래 기본법에 따라 법적 효력을 가집니다.
+        </p>
+        <button class="btn-sign" id="btn-employee-sign" data-id="${c.id}">✍️ 서명하기</button>
+      ` : ''}
+    </div>
+  `;
+
+  $('#contract-detail-modal').classList.add('active');
+
+  const signBtn = $('#btn-employee-sign');
+  if (signBtn) {
+    signBtn.addEventListener('click', async () => {
+      if (!confirm(`"${profile.name}"(으)로 전자서명하시겠습니까?\n서명 후에는 취소할 수 없습니다.`)) return;
+      signBtn.disabled = true;
+      signBtn.textContent = '서명 중…';
+      const now = new Date().toISOString();
+      const { error: se } = await supabase.from('labor_contracts').update({
+        employee_name:      profile.name,
+        employee_signed_at: now,
+        status:             'completed',
+        updated_at:         now,
+      }).eq('id', signBtn.dataset.id);
+      if (se) { toast(se.message, 'error'); signBtn.disabled = false; signBtn.textContent = '✍️ 서명하기'; return; }
+      toast('서명이 완료됐습니다! 계약서가 효력을 발생합니다.', 'success', 4000);
+      $('#contract-detail-modal').classList.remove('active');
+      await loadContracts();
+    });
+  }
 }
 
 async function loadSalary() {

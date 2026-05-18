@@ -33,6 +33,19 @@ export async function renderOverview({ root, profile }) {
       </div>
     </div>
 
+    <div class="card" id="card-52h">
+      <div class="card-head"><h2>주 52시간 현황</h2><div class="card-sub" id="week-range-label">이번 주 근로시간 모니터링</div></div>
+      <div class="table-wrap">
+        <table class="att-table">
+          <thead><tr><th>직원</th><th>이번 주 근무</th><th>연장근로</th><th>상태</th></tr></thead>
+          <tbody id="h52-rows"><tr><td colspan="4" class="empty">불러오는 중…</td></tr></tbody>
+        </table>
+      </div>
+      <div style="padding:10px 20px 4px;font-size:11px;color:#94a3b8">
+        법정 40h + 연장 12h = 주 52h 한도 (근로기준법 §53) · 5인 이상 사업장 전체 적용
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-head"><h2>실시간 출퇴근</h2><div class="card-sub">최근 24시간 기록</div></div>
       <div class="table-wrap">
@@ -47,6 +60,7 @@ export async function renderOverview({ root, profile }) {
   await loadKpi(root, profile);
   await loadRecent(root, profile);
   await loadMonthStats(root, profile);
+  await load52h(root, profile);
   setupPushBanner(root, profile);
 
   const channel = supabase.channel('owner-att')
@@ -203,6 +217,71 @@ async function loadMonthStats(root, profile) {
         <div style="font-size:10px;color:${isToday ? '#00c9a7' : '#94a3b8'};font-weight:${isToday ? 700 : 400}">${label}</div>
         <div style="font-size:9px;color:#94a3b8">${day}</div>
       </div>`;
+  }).join('');
+}
+
+async function load52h(root, profile) {
+  // 이번 주 월~일 범위 (6AM 기준 workday 사용)
+  const todayKst  = nowKst();
+  // 월요일 기준 주 시작 (isoWeekday: 1=월)
+  const weekStart = todayKst.clone().startOf('isoWeek').format('YYYY-MM-DD');
+  const weekEnd   = todayKst.clone().endOf('isoWeek').format('YYYY-MM-DD');
+
+  const label = root.querySelector('#week-range-label');
+  if (label) label.textContent = `${weekStart} ~ ${weekEnd} 근로시간`;
+
+  const [{ data: atts }, { data: emps }] = await Promise.all([
+    supabase
+      .from('attendances')
+      .select('employee_id, check_in_at, check_out_at, workday')
+      .eq('tenant_id', profile.tenant_id)
+      .gte('workday', weekStart)
+      .lte('workday', weekEnd),
+    supabase
+      .from('profiles')
+      .select('id, name')
+      .eq('tenant_id', profile.tenant_id)
+      .in('role', ['employee', 'manager'])
+      .eq('active', true)
+      .order('name'),
+  ]);
+
+  const tbody = root.querySelector('#h52-rows');
+  if (!tbody) return;
+  if (!emps?.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">활성 직원이 없습니다</td></tr>'; return; }
+
+  // 직원별 주간 분 합산
+  const minuteMap = {};
+  for (const r of (atts || [])) {
+    if (!r.check_out_at) continue;
+    const min = diffMinutes(r.check_in_at, r.check_out_at);
+    minuteMap[r.employee_id] = (minuteMap[r.employee_id] || 0) + min;
+  }
+
+  tbody.innerHTML = emps.map(e => {
+    const totalMin  = minuteMap[e.id] || 0;
+    const totalHrs  = (totalMin / 60).toFixed(1);
+    const legalMin  = 40 * 60;   // 법정 40시간
+    const extMin    = Math.max(0, totalMin - legalMin);
+    const extHrs    = (extMin / 60).toFixed(1);
+
+    let badgeClass, badgeText;
+    if (totalMin >= 52 * 60) {
+      badgeClass = 'h52-over'; badgeText = '⚠️ 52h 초과';
+    } else if (totalMin >= 48 * 60) {
+      badgeClass = 'h52-warn'; badgeText = '주의 48h+';
+    } else if (totalMin >= 40 * 60) {
+      badgeClass = 'h52-warn'; badgeText = '연장근로 중';
+    } else {
+      badgeClass = 'h52-ok'; badgeText = '정상';
+    }
+
+    return `<tr>
+      <td><strong>${e.name}</strong></td>
+      <td>${totalHrs}h</td>
+      <td style="color:${extMin > 0 ? '#d97706' : '#94a3b8'}">${extMin > 0 ? extHrs + 'h' : '-'}</td>
+      <td><span class="h52-badge ${badgeClass}">${badgeText}</span></td>
+    </tr>`;
   }).join('');
 }
 
