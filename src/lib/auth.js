@@ -13,7 +13,7 @@ export async function getMyProfile() {
   // 먼저 profiles + tenants 조인 시도
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, tenant_id, role, store_id, name, phone, email, hourly_wage, position, active, tenants(name, business_type, industry_type, plan, subscription_status, trial_ends_at)')
+    .select('id, tenant_id, role, store_id, name, phone, email, hourly_wage, position, active, is_super_admin, tenants(name, business_type, industry_type, plan, subscription_status, trial_ends_at)')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -22,7 +22,7 @@ export async function getMyProfile() {
     // 조인 실패 시 profiles만 조회
     const { data: d2, error: e2 } = await supabase
       .from('profiles')
-      .select('id, tenant_id, role, store_id, name, phone, email, hourly_wage, position, active')
+      .select('id, tenant_id, role, store_id, name, phone, email, hourly_wage, position, active, is_super_admin')
       .eq('id', user.id)
       .maybeSingle();
     if (e2) {

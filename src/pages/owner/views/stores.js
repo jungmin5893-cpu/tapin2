@@ -166,7 +166,10 @@ async function loadStores(root, profile, siteLbl, wLbl) {
       <div class="store-qr-wrap">
         <div class="qr-block">
           <div id="qr-${s.id}" class="qr-canvas"></div>
-          <button class="btn small" data-download="${s.id}" style="margin-top:6px">QR 저장</button>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn small" data-download="${s.id}" data-name="${s.name}">⬇ QR 저장</button>
+            <button class="btn small" data-print="${s.id}" data-name="${s.name}">🖨 프린트</button>
+          </div>
         </div>
         <div class="store-info">
           <div style="font-size:12px;color:#8a94a6"><b>위치:</b> ${s.gps_lat ? `${s.gps_lat.toFixed(4)}, ${s.gps_lng.toFixed(4)}` : '미설정'}</div>
@@ -204,7 +207,11 @@ async function loadStores(root, profile, siteLbl, wLbl) {
   }));
   list.querySelectorAll('[data-download]').forEach(b => b.addEventListener('click', e => {
     e.stopPropagation();
-    downloadQr(root, b.dataset.download);
+    downloadQr(root, b.dataset.download, b.dataset.name);
+  }));
+  list.querySelectorAll('[data-print]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    printQr(root, b.dataset.print, b.dataset.name);
   }));
 }
 
@@ -487,19 +494,69 @@ async function renderQr(root, id, text) {
       window._QRCode = QRCode;
     }
     const canvas = document.createElement('canvas');
-    await window._QRCode.toCanvas(canvas, text, { width:200, margin:1, color:{dark:'#0f1b2d',light:'#ffffff'} });
+    await window._QRCode.toCanvas(canvas, text, { width:512, margin:2, color:{dark:'#0f1b2d',light:'#ffffff'} });
+    canvas.style.cssText = 'width:200px;height:200px;display:block';
     el.innerHTML = ''; el.appendChild(canvas); el._canvas = canvas;
   } catch(err) {
     el.innerHTML = `<div style="color:#f04438;font-size:12px">QR 실패: ${err.message}</div>`;
   }
 }
 
-function downloadQr(root, sid) {
+function downloadQr(root, sid, storeName) {
   const canvas = root.querySelector(`#qr-${sid}`)._canvas;
   if (!canvas) return;
+  const safeName = (storeName || sid.slice(0,8)).replace(/[^\w가-힣]/g, '_');
   const a = document.createElement('a');
-  a.download = `TAGIN_QR_${sid.slice(0,8)}.png`;
+  a.download = `TAGIN_QR_${safeName}.png`;
   a.href = canvas.toDataURL('image/png'); a.click();
+}
+
+function printQr(root, sid, storeName) {
+  const canvas = root.querySelector(`#qr-${sid}`)._canvas;
+  if (!canvas) return;
+  const dataUrl = canvas.toDataURL('image/png');
+  const win = window.open('', '_blank', 'width=520,height=720');
+  win.document.write(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>QR 코드 — ${storeName}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, 'Malgun Gothic', sans-serif; background: #fff; color: #0f1b2d; }
+    .page { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 48px 32px; }
+    .brand { font-size: 12px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #94a3b8; margin-bottom: 20px; }
+    .store-name { font-size: 26px; font-weight: 800; text-align: center; margin-bottom: 28px; line-height: 1.3; }
+    .qr-wrap { border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; background: #fafbfc; }
+    .qr-wrap img { width: 260px; height: 260px; display: block; image-rendering: pixelated; }
+    .guide { margin-top: 24px; font-size: 13px; color: #64748b; text-align: center; line-height: 1.8; }
+    .guide strong { color: #0f1b2d; }
+    .print-btn { margin-top: 32px; padding: 13px 40px; background: #0f1b2d; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: .3px; }
+    .print-btn:hover { background: #1e3a5f; }
+    @media print {
+      .print-btn { display: none; }
+      .page { padding: 32px; min-height: unset; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="brand">TAGIN 출퇴근 시스템</div>
+    <div class="store-name">${storeName}</div>
+    <div class="qr-wrap">
+      <img src="${dataUrl}" alt="QR 코드">
+    </div>
+    <div class="guide">
+      <strong>출퇴근 QR 코드</strong><br>
+      직원 앱에서 이 QR 코드를 스캔하면<br>
+      자동으로 출근 / 퇴근이 기록됩니다
+    </div>
+    <button class="print-btn" onclick="window.print()">🖨&nbsp; 프린트</button>
+  </div>
+</body>
+</html>`);
+  win.document.close();
+  win.focus();
 }
 
 async function regenQr(root, sid, profile, siteLbl, wLbl) {

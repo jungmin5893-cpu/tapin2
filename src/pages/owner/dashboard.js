@@ -10,6 +10,7 @@ import { renderStores } from './views/stores.js';
 import { renderShifts } from './views/shifts.js';
 import { renderPayroll } from './views/payroll.js';
 import { renderSettings } from './views/settings.js';
+import { renderSuperAdmin } from './views/superadmin.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -26,6 +27,7 @@ const ROUTES = {
   shifts: renderShifts,
   payroll: renderPayroll,
   settings: renderSettings,
+  superadmin: renderSuperAdmin,
 };
 
 init();
@@ -53,6 +55,12 @@ async function init() {
 
   // 유료 기능 잠금 표시
   applyFeatureLock(profile.tenants);
+
+  // 슈퍼어드민 메뉴 표시
+  if (profile.is_super_admin) {
+    const navSA = $('#nav-superadmin');
+    if (navSA) navSA.style.display = 'flex';
+  }
 
   initOfflineBar();
   showTrialBadge(profile.tenants);
@@ -193,8 +201,8 @@ function applyFeatureLock(tenant) {
 async function navigate(route, fromHash = false) {
   if (!ROUTES[route]) route = 'overview';
 
-  // 무료/만료 상태에서 유료 기능 접근 차단
-  if (!canAccess(profile.tenants, route) && route !== 'overview') {
+  // 무료/만료 상태에서 유료 기능 접근 차단 (슈퍼어드민 패널은 제외)
+  if (route !== 'superadmin' && !canAccess(profile.tenants, route) && route !== 'overview') {
     showUpgradePrompt(route);
     return;
   }
