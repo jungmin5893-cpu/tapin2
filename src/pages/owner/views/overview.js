@@ -20,6 +20,20 @@ export async function renderOverview({ root, profile }) {
     </div>
 
     <div class="card">
+      <div class="card-head"><h2>이번 달 요약</h2><div class="card-sub">${nowKst().format('YYYY년 M월')}</div></div>
+      <div class="kpi-grid" id="month-kpi" style="margin-top:0">
+        <div class="kpi-card"><div class="kpi-label">총 근무일</div><div class="kpi-val" id="m-days">-</div><div class="kpi-foot">연인원 기준</div></div>
+        <div class="kpi-card"><div class="kpi-label">총 근무시간</div><div class="kpi-val" id="m-hours">-</div><div class="kpi-foot">시간</div></div>
+        <div class="kpi-card"><div class="kpi-label">초과근무</div><div class="kpi-val orange" id="m-overtime">-</div><div class="kpi-foot">8시간 초과 건수</div></div>
+        <div class="kpi-card"><div class="kpi-label">평균 근무</div><div class="kpi-val" id="m-avg">-</div><div class="kpi-foot">1인당 시간/일</div></div>
+      </div>
+      <div style="padding:0 4px 4px">
+        <div style="font-size:12px;font-weight:700;color:#64748b;margin:16px 0 10px">최근 7일 출근 인원</div>
+        <div id="trend-chart" style="display:flex;align-items:flex-end;gap:6px;height:80px;"></div>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-head"><h2>실시간 출퇴근</h2><div class="card-sub">최근 24시간 기록</div></div>
       <div class="table-wrap">
         <table class="att-table">
@@ -32,6 +46,7 @@ export async function renderOverview({ root, profile }) {
 
   await loadKpi(root, profile);
   await loadRecent(root, profile);
+  await loadMonthStats(root, profile);
   setupPushBanner(root, profile);
 
   const channel = supabase.channel('owner-att')
@@ -114,6 +129,81 @@ async function countRows(table, filters) {
   }
   const { count } = await q;
   return count;
+}
+
+async function loadMonthStats(root, profile) {
+  const monthStart = nowKst().startOf('month').format('YYYY-MM-DD');
+  const monthEnd   = nowKst().endOf('month').format('YYYY-MM-DD');
+  const weekAgo    = nowKst().subtract(6, 'day').format('YYYY-MM-DD');
+  const today      = fmtDate(new Date());
+
+  const { data } = await supabase
+    .from('attendances')
+    .select('employee_id, workday, check_in_at, check_out_at')
+    .eq('tenant_id', profile.tenant_id)
+    .gte('workday', monthStart)
+    .lte('workday', monthEnd);
+
+  if (!data) return;
+
+  let totalMinutes = 0, overtimeCount = 0;
+  const attendedDays = new Set();
+
+  for (const r of data) {
+    attendedDays.add(r.workday + '_' + r.employee_id);
+    if (r.check_out_at) {
+      const min = diffMinutes(r.check_in_at, r.check_out_at);
+      totalMinutes += min;
+      if (min > 480) overtimeCount++; // 8시간 초과
+    }
+  }
+
+  const totalDays = attendedDays.size;
+  const totalHours = Math.floor(totalMinutes / 60);
+  const avgHours = totalDays > 0 ? (totalMinutes / 60 / totalDays).toFixed(1) : 0;
+
+  const mDays = root.querySelector('#m-days');
+  const mHours = root.querySelector('#m-hours');
+  const mOvertime = root.querySelector('#m-overtime');
+  const mAvg = root.querySelector('#m-avg');
+  if (!mDays) return;
+  mDays.textContent = totalDays;
+  mHours.textContent = totalHours;
+  mOvertime.textContent = overtimeCount;
+  mAvg.textContent = avgHours;
+
+  // 최근 7일 트렌드 차트
+  const dayMap = {};
+  for (let i = 6; i >= 0; i--) {
+    const d = nowKst().subtract(i, 'day').format('YYYY-MM-DD');
+    dayMap[d] = new Set();
+  }
+  for (const r of data) {
+    if (r.workday >= weekAgo && r.workday <= today) {
+      if (!dayMap[r.workday]) dayMap[r.workday] = new Set();
+      dayMap[r.workday].add(r.employee_id);
+    }
+  }
+
+  const days = Object.entries(dayMap);
+  const maxCount = Math.max(1, ...days.map(([, s]) => s.size));
+  const chart = root.querySelector('#trend-chart');
+  if (!chart) return;
+
+  chart.innerHTML = days.map(([date, empSet]) => {
+    const count = empSet.size;
+    const heightPct = Math.max(4, Math.round((count / maxCount) * 100));
+    const isToday = date === today;
+    const label = kst(date).format('M/D');
+    const day = kst(date).format('dd');
+    return `
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="font-size:11px;font-weight:700;color:${isToday ? '#00c9a7' : '#334155'}">${count || ''}</div>
+        <div style="width:100%;background:${isToday ? '#00c9a7' : '#e2e8f0'};border-radius:4px 4px 0 0;height:${heightPct}%;min-height:4px;transition:height .3s"></div>
+        <div style="font-size:10px;color:${isToday ? '#00c9a7' : '#94a3b8'};font-weight:${isToday ? 700 : 400}">${label}</div>
+        <div style="font-size:9px;color:#94a3b8">${day}</div>
+      </div>`;
+  }).join('');
 }
 
 async function loadRecent(root, profile) {
