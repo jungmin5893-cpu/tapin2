@@ -327,6 +327,9 @@ select.cell-edit{cursor:pointer;}
 .h52-ok{background:#d1fae5;color:#059669;}
 .h52-warn{background:#fef3c7;color:#d97706;}
 .h52-over{background:#fee2e2;color:#dc2626;}
+
+/* ── 출역 현황 배지 ── */
+.att-table .pill.warn{background:#fef3c7;color:#b45309;}
 </style>
 </head>
 <body>
@@ -342,6 +345,7 @@ select.cell-edit{cursor:pointer;}
   <nav class="nav-list">
     <div class="nav-section">기본</div>
     <button class="nav-item" data-route="overview"><span class="ic">▣</span>대시보드</button>
+    <button class="nav-item" id="nav-agency" data-route="agency" style="display:none"><span class="ic">▣</span>출역 현황</button>
     <button class="nav-item" data-route="attendance"><span class="ic">○</span>출퇴근</button>
     <div class="nav-section">관리</div>
     <button class="nav-item" data-route="employees" data-feature="employees"><span class="ic">○</span><span id="nav-workers">직원 관리</span></button>

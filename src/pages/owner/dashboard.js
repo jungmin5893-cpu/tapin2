@@ -13,6 +13,7 @@ import { renderSettings } from './views/settings.js';
 import { renderSuperAdmin } from './views/superadmin.js';
 import { renderLeaves } from './views/leaves.js';
 import { renderContracts } from './views/contracts.js';
+import { renderAgency } from './views/agency.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -32,6 +33,7 @@ const ROUTES = {
   superadmin: renderSuperAdmin,
   leaves: renderLeaves,
   contracts: renderContracts,
+  agency: renderAgency,
 };
 
 init();
@@ -59,6 +61,12 @@ async function init() {
 
   // 유료 기능 잠금 표시
   applyFeatureLock(profile.tenants);
+
+  // 인력사무소: 출역 현황 메뉴 표시 + 기본 뷰 변경
+  if (profile.tenants?.industry_type === '인력사무소') {
+    const navAgency = $('#nav-agency');
+    if (navAgency) navAgency.style.display = 'flex';
+  }
 
   // 슈퍼어드민 메뉴 표시
   if (profile.is_super_admin) {
@@ -90,7 +98,8 @@ async function init() {
 
   bindNav();
 
-  const initial = location.hash.replace('#/', '') || 'overview';
+  const defaultRoute = profile.tenants?.industry_type === '인력사무소' ? 'agency' : 'overview';
+  const initial = location.hash.replace('#/', '') || defaultRoute;
   navigate(initial);
 }
 
