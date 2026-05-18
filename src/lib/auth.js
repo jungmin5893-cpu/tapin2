@@ -1,7 +1,8 @@
 import { supabase, decodeJwt } from './supabase.js';
 
 const ROUTE = {
-  owner: 'dashboard.html',
+  owner:   'dashboard.html',
+  manager: 'dashboard.html',
   employee: 'employee.html',
   none: 'login.html',
 };

@@ -57,7 +57,7 @@ export async function renderEmployees({ root, profile }) {
             <tr>
               <th>이름</th><th>전화번호</th><th>${sLbl}</th>
               <th>급여 방식</th><th>금액</th>
-              <th>직책</th><th>공제</th><th>활성</th><th></th>
+              <th>직책</th><th>공제</th><th>활성</th><th>권한</th><th></th>
             </tr>
           </thead>
           <tbody id="emp-rows"></tbody>
@@ -151,9 +151,9 @@ async function loadEmployees(root, profile) {
   // wage_type / deduction_type 컬럼이 없는 구 DB 대비 fallback
   let { data, error } = await supabase
     .from('profiles')
-    .select('id, name, phone, hourly_wage, wage_type, deduction_type, position, active, store_id, store:stores(name)')
+    .select('id, name, phone, hourly_wage, wage_type, deduction_type, position, active, store_id, role, store:stores(name)')
     .eq('tenant_id', profile.tenant_id)
-    .eq('role', 'employee')
+    .in('role', ['employee', 'manager'])
     .order('name');
 
   if (error && /wage_type|deduction_type/i.test(error.message)) {
@@ -231,6 +231,14 @@ async function loadEmployees(root, profile) {
           <span></span>
         </label>
       </td>
+      <td>
+        ${r.role === 'manager'
+          ? `<span style="font-size:11px;font-weight:700;color:#d97706;background:#fef3c7;padding:3px 8px;border-radius:12px">매니저</span>`
+          : ''}
+        <button class="btn small ghost" data-role-toggle="${r.id}" data-current-role="${r.role}" style="font-size:11px;margin-top:4px">
+          ${r.role === 'manager' ? '권한 해제' : '매니저 지정'}
+        </button>
+      </td>
       <td><button class="btn small primary" data-save="${r.id}">저장</button></td>
     </tr>`;
   }).join('');
@@ -282,6 +290,23 @@ async function loadEmployees(root, profile) {
       btn.disabled = false;
       if (error) toast(error.message, 'error');
       else toast('저장됨', 'success');
+    });
+  });
+
+  // 매니저 지정 / 해제
+  tbody.querySelectorAll('[data-role-toggle]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const empId = btn.dataset.roleToggle;
+      const cur   = btn.dataset.currentRole;
+      const next  = cur === 'manager' ? 'employee' : 'manager';
+      const label = next === 'manager' ? '매니저로 지정' : '일반 직원으로 변경';
+      if (!confirm(`${label}하시겠습니까?\n매니저는 출퇴근·직원·연차 관리 권한을 갖습니다.`)) return;
+      btn.disabled = true;
+      const { error } = await supabase.from('profiles').update({ role: next }).eq('id', empId);
+      btn.disabled = false;
+      if (error) { toast(error.message, 'error'); return; }
+      toast(next === 'manager' ? '매니저로 지정됐습니다' : '일반 직원으로 변경됐습니다', 'success');
+      await loadEmployees(root, profile);
     });
   });
 }

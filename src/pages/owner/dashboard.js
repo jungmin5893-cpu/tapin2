@@ -35,7 +35,7 @@ const ROUTES = {
 init();
 
 async function init() {
-  profile = await requireRole('owner');
+  profile = await requireRole(['owner', 'manager']);
   if (!profile) return;
 
   $('#biz-name').textContent = profile.tenants?.name || '사업장';
@@ -62,6 +62,20 @@ async function init() {
   if (profile.is_super_admin) {
     const navSA = $('#nav-superadmin');
     if (navSA) navSA.style.display = 'flex';
+  }
+
+  // 매니저(서브 관리자): 급여·설정·시프트 메뉴 숨김
+  if (profile.role === 'manager') {
+    ['shifts', 'payroll', 'settings'].forEach(r => {
+      const el = $(`[data-route="${r}"]`);
+      if (el) el.style.display = 'none';
+    });
+    // 매니저 배지 표시
+    const badge = $('#trial-badge');
+    if (badge) {
+      badge.textContent = '서브 관리자';
+      badge.className = 'trial-badge active manager';
+    }
   }
 
   initOfflineBar();
@@ -207,6 +221,13 @@ function applyFeatureLock(tenant) {
 
 async function navigate(route, fromHash = false) {
   if (!ROUTES[route]) route = 'overview';
+
+  // 매니저: 급여·설정·시프트 접근 차단
+  const MANAGER_BLOCKED = ['shifts', 'payroll', 'settings'];
+  if (profile.role === 'manager' && MANAGER_BLOCKED.includes(route)) {
+    toast('매니저 권한으로는 접근할 수 없습니다', 'warn');
+    return;
+  }
 
   // 무료/만료 상태에서 유료 기능 접근 차단 (슈퍼어드민 패널은 제외)
   if (route !== 'superadmin' && !canAccess(profile.tenants, route) && route !== 'overview') {
