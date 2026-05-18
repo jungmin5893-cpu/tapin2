@@ -11,13 +11,18 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
+  /* 브랜드 컬러 — 다현장 인력관리 B2B 톤 */
+  --primary:#0F2942;   /* 다크 네이비 */
+  --primary2:#1a3a58;
+  --gold:#B8935A;      /* 골드 액센트 */
+  --gold2:#a07840;
   --green:#00c9a7;--green2:#00b096;--green3:#e0faf6;
-  --navy:#0f1b2d;--navy2:#1a2d45;--navy3:#243650;
+  --navy:#0F2942;--navy2:#1a3a58;--navy3:#243650;
   --gray1:#f4f6f9;--gray2:#e2e7ef;--gray3:#8a94a6;--gray4:#3d4a5c;
-  --dark:#0f1b2d;--white:#fff;
-  --red:#f04438;--orange:#f79009;--blue:#1565c0;
-  --shadow:0 2px 12px rgba(0,0,0,.08);
-  --radius:12px;
+  --dark:#0F2942;--white:#fff;
+  --red:#8B2C2C;--orange:#c47f17;--blue:#1565c0;
+  --shadow:0 1px 6px rgba(0,0,0,.06);
+  --radius:5px;
 }
 html,body{height:100%;}
 body{font-family:'Inter','Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:var(--gray1);color:var(--dark);min-height:100vh;display:flex;justify-content:center;}
@@ -26,21 +31,23 @@ body{font-family:'Inter','Malgun Gothic','Apple SD Gothic Neo',sans-serif;backgr
 .app-wrap{display:flex;width:100%;max-width:1440px;min-height:100vh;position:relative;}
 
 /* ── 사이드바 ── */
-.sidebar{width:240px;background:var(--navy);color:#fff;display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;}
-.side-head{padding:20px 22px 16px;border-bottom:1px solid rgba(255,255,255,.06);}
-.side-head .logo{font-size:22px;font-weight:900;letter-spacing:2px;}
-.side-head .logo span{color:var(--green);}
-.side-head .biz{font-size:13px;color:rgba(255,255,255,.65);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.trial-badge{display:none;margin:10px 22px 0;padding:6px 12px;background:linear-gradient(90deg,#7c3aed,#a855f7);border-radius:16px;font-size:12px;font-weight:700;text-align:center;}
+.sidebar{width:220px;background:var(--navy);color:#fff;display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;}
+.side-head{padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08);}
+.side-head .logo{font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;}
+.side-head .logo span{color:var(--gold);}
+.side-head .biz{font-size:12px;color:rgba(255,255,255,.5);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.trial-badge{display:none;margin:8px 18px 0;padding:5px 10px;background:rgba(184,147,90,.2);border:1px solid rgba(184,147,90,.4);border-radius:4px;font-size:11px;font-weight:700;text-align:center;color:var(--gold);}
 .trial-badge.active{display:block;}
-.trial-badge.paid{background:linear-gradient(90deg,#00c9a7,#00b096);}
-.trial-badge.expired{background:linear-gradient(90deg,#f04438,#d92d20);}
+.trial-badge.paid{background:rgba(0,201,167,.15);border-color:rgba(0,201,167,.3);color:var(--green);}
+.trial-badge.expired{background:rgba(139,44,44,.2);border-color:rgba(139,44,44,.4);color:#e57373;}
 
-.nav-list{flex:1;padding:14px 0;overflow-y:auto;}
-.nav-item{padding:11px 22px;font-size:14px;color:rgba(255,255,255,.72);cursor:pointer;display:flex;align-items:center;gap:10px;transition:.15s;border:none;background:none;width:100%;text-align:left;font-family:inherit;border-left:3px solid transparent;}
-.nav-item:hover{background:rgba(255,255,255,.06);color:#fff;}
-.nav-item.active{background:rgba(0,201,167,.12);color:var(--green);font-weight:700;border-left-color:var(--green);}
-.nav-item .ic{font-size:18px;flex-shrink:0;}
+.nav-section{padding:14px 18px 4px;font-size:10px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:1px;text-transform:uppercase;}
+.nav-list{flex:1;padding:8px 0;overflow-y:auto;}
+.nav-item{padding:10px 18px;font-size:13px;color:rgba(255,255,255,.65);cursor:pointer;display:flex;align-items:center;gap:9px;transition:.12s;border:none;background:none;width:100%;text-align:left;font-family:inherit;border-left:3px solid transparent;}
+.nav-item:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.9);}
+.nav-item.active{background:rgba(184,147,90,.12);color:var(--gold);font-weight:700;border-left-color:var(--gold);}
+.nav-item.locked{opacity:.4;cursor:not-allowed;}
+.nav-item .ic{font-size:15px;flex-shrink:0;width:18px;text-align:center;}
 
 .side-foot{padding:14px 22px;border-top:1px solid rgba(255,255,255,.06);}
 .owner-chip{display:flex;align-items:center;gap:8px;font-size:13px;}
@@ -67,17 +74,19 @@ body{font-family:'Inter','Malgun Gothic','Apple SD Gothic Neo',sans-serif;backgr
 .page-head .page-sub{color:var(--gray3);font-size:13px;margin-top:5px;line-height:1.5;}
 
 /* ── KPI 그리드 ── */
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
-.kpi-card{background:#fff;border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border:1px solid rgba(0,0,0,.04);}
-.kpi-card .kpi-label{font-size:11px;color:var(--gray3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
-.kpi-card .kpi-val{font-size:30px;font-weight:900;color:var(--green);font-variant-numeric:tabular-nums;line-height:1;}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
+.kpi-card{background:#fff;border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border:1px solid var(--gray2);border-left:4px solid var(--primary);position:relative;overflow:hidden;}
+.kpi-card::after{content:'';position:absolute;top:0;right:0;width:60px;height:100%;background:linear-gradient(270deg,rgba(184,147,90,.04),transparent);pointer-events:none;}
+.kpi-card .kpi-label{font-size:11px;color:var(--gray3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.kpi-card .kpi-val{font-size:28px;font-weight:900;color:var(--primary);font-variant-numeric:tabular-nums;line-height:1;}
 .kpi-card .kpi-val.red{color:var(--red);}
-.kpi-card .kpi-foot{font-size:11px;color:var(--gray3);margin-top:6px;}
+.kpi-card .kpi-val.gold{color:var(--gold);}
+.kpi-card .kpi-foot{font-size:11px;color:var(--gray3);margin-top:5px;}
 
 /* ── 카드 ── */
-.card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;border:1px solid rgba(0,0,0,.04);}
-.card .card-head{padding:16px 20px;border-bottom:1px solid var(--gray2);display:flex;flex-direction:column;gap:3px;}
-.card .card-head h2{font-size:15px;font-weight:800;}
+.card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden;border:1px solid var(--gray2);border-left:4px solid var(--gold);}
+.card .card-head{padding:14px 18px;border-bottom:1px solid var(--gray2);display:flex;flex-direction:column;gap:2px;}
+.card .card-head h2{font-size:14px;font-weight:800;color:var(--navy);letter-spacing:-.2px;}
 .card .card-head .card-sub{font-size:12px;color:var(--gray3);}
 
 /* ── 테이블 ── */
@@ -313,16 +322,22 @@ select.cell-edit{cursor:pointer;}
   </div>
   <div class="trial-badge" id="trial-badge"></div>
   <nav class="nav-list">
-    <button class="nav-item" data-route="overview"><span class="ic">📊</span>대시보드</button>
-    <button class="nav-item" data-route="attendance"><span class="ic">🕒</span>근태 관리</button>
-    <button class="nav-item" data-route="employees"><span class="ic">👥</span>직원 관리</button>
-    <button class="nav-item" data-route="stores"><span class="ic">🏪</span>매장 / QR</button>
-    <button class="nav-item" data-route="shifts"><span class="ic">📅</span>시프트</button>
-    <button class="nav-item" data-route="payroll"><span class="ic">💰</span>급여</button>
-    <button class="nav-item" data-route="settings"><span class="ic">⚙️</span>설정</button>
+    <div class="nav-section">기본</div>
+    <button class="nav-item" data-route="overview"><span class="ic">▣</span>대시보드</button>
+    <button class="nav-item" data-route="attendance"><span class="ic">○</span>출퇴근</button>
+    <div class="nav-section">관리</div>
+    <button class="nav-item" data-route="employees" data-feature="employees"><span class="ic">○</span><span id="nav-workers">직원 관리</span></button>
+    <button class="nav-item" data-route="stores" data-feature="stores"><span class="ic">○</span><span id="nav-sites">현장 / QR</span></button>
+    <button class="nav-item" data-route="shifts" data-feature="shifts"><span class="ic">○</span>시프트</button>
+    <button class="nav-item" data-route="payroll" data-feature="payroll"><span class="ic">○</span>급여</button>
+    <div class="nav-section">시스템</div>
+    <button class="nav-item" data-route="settings" data-feature="settings"><span class="ic">○</span>설정</button>
   </nav>
   <div class="side-foot">
-    <div class="owner-chip"><div class="avatar">👔</div><div><div id="owner-name">사장님</div></div></div>
+    <div class="owner-chip">
+      <div class="avatar" id="owner-avatar">O</div>
+      <div><div id="owner-name" style="font-size:13px;font-weight:600">관리자</div><div id="owner-industry" style="font-size:10px;color:rgba(255,255,255,.4);margin-top:1px"></div></div>
+    </div>
     <button class="btn-logout" id="btn-logout">로그아웃</button>
   </div>
 </aside>

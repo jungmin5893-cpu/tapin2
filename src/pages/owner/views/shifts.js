@@ -1,5 +1,6 @@
 import { supabase } from '../../../lib/supabase.js';
 import { toast } from '../../../lib/toast.js';
+import { getLabels } from '../../../lib/labels.js';
 import {
   listShiftTypes, upsertShiftType, deleteShiftType,
   listShiftSchedules, upsertShiftSchedule, setOffDay,
@@ -9,6 +10,11 @@ import {
 const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 
 export async function renderShifts({ root, profile }) {
+  const labels = getLabels(profile.tenants?.industry_type);
+  const sLbl = labels.site;
+  root._siteLbl = sLbl;
+  root._workerLbl = labels.worker;
+
   root.innerHTML = `
     <div class="page-head">
       <h1>시프트 관리</h1>
@@ -33,8 +39,8 @@ export async function renderShifts({ root, profile }) {
 
     <div class="card" id="card-store-pick" style="display:none">
       <div class="card-head">
-        <h2>매장 선택</h2>
-        <div class="card-sub">스케줄을 짤 매장을 선택하세요</div>
+        <h2>${sLbl} 선택</h2>
+        <div class="card-sub">스케줄을 짤 ${sLbl}을 선택하세요</div>
       </div>
       <div id="store-list" class="store-pick-list"></div>
     </div>
@@ -43,7 +49,7 @@ export async function renderShifts({ root, profile }) {
       <div class="card-head">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <h2 id="cal-title">스케줄</h2>
-          <button class="btn small ghost" id="btn-back-stores" style="display:none">← 매장 선택</button>
+          <button class="btn small ghost" id="btn-back-stores" style="display:none">← ${sLbl} 선택</button>
         </div>
         <div class="card-sub">셀 클릭 → 시프트/휴무 선택. 시프트 변경은 즉시 저장됩니다.</div>
       </div>
@@ -166,7 +172,7 @@ async function loadStoresAndPick(root, profile) {
 
   if (root._shiftState.stores.length === 0) {
     root.querySelector('#card-calendar').style.display = 'block';
-    root.querySelector('#cal-grid').innerHTML = '<tr><td class="empty">먼저 매장을 등록해주세요</td></tr>';
+    root.querySelector('#cal-grid').innerHTML = `<tr><td class="empty">먼저 ${root._siteLbl || '현장'}을 등록해주세요</td></tr>`;
     return;
   }
 
@@ -265,7 +271,7 @@ function renderGrid(root, profile) {
   grid.className = isMonth ? 'cal-grid monthly' : 'cal-grid';
 
   if (!state.employees.length) {
-    grid.innerHTML = `<thead><tr><th class="emp-col">직원</th><th>이 매장에 활성 직원이 없습니다</th></tr></thead>`;
+    grid.innerHTML = `<thead><tr><th class="emp-col">${root._workerLbl || '직원'}</th><th>이 ${root._siteLbl || '현장'}에 활성 ${root._workerLbl || '직원'}이 없습니다</th></tr></thead>`;
     return;
   }
 

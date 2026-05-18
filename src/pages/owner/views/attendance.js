@@ -2,8 +2,10 @@ import { supabase } from '../../../lib/supabase.js';
 import { nowKst, kst, fmtDate, minutesToHm, diffMinutes } from '../../../lib/time.js';
 import { toast } from '../../../lib/toast.js';
 import * as XLSX from 'xlsx';
+import { getLabels } from '../../../lib/labels.js';
 
 export async function renderAttendance({ root, profile }) {
+  const labels = getLabels(profile.tenants?.industry_type);
   const monthStart = nowKst().startOf('month').format('YYYY-MM-DD');
   const monthEnd = nowKst().endOf('month').format('YYYY-MM-DD');
 
@@ -14,15 +16,15 @@ export async function renderAttendance({ root, profile }) {
     </div>
     <div class="filter-bar">
       <input type="month" id="att-month" value="${nowKst().format('YYYY-MM')}">
-      <select id="att-employee"><option value="">전체 직원</option></select>
-      <select id="att-store"><option value="">전체 매장</option></select>
+      <select id="att-employee"><option value="">전체 ${labels.worker}</option></select>
+      <select id="att-store"><option value="">전체 ${labels.site}</option></select>
       <button class="btn primary" id="btn-refresh">조회</button>
-      <button class="btn" id="btn-export">📥 엑셀 다운로드</button>
+      <button class="btn" id="btn-export">엑셀 다운로드</button>
     </div>
     <div class="card">
       <div class="table-wrap">
         <table class="att-table">
-          <thead><tr><th>날짜</th><th>이름</th><th>매장</th><th>시프트</th><th>출근</th><th>퇴근</th><th>근무</th><th>메모</th></tr></thead>
+          <thead><tr><th>날짜</th><th>이름</th><th>${labels.site}</th><th>시프트</th><th>출근</th><th>퇴근</th><th>근무</th><th>메모</th></tr></thead>
           <tbody id="att-rows"><tr><td colspan="8" class="empty">조회를 눌러주세요</td></tr></tbody>
         </table>
       </div>
@@ -38,7 +40,7 @@ export async function renderAttendance({ root, profile }) {
     const end = nowKst().year(+m.split('-')[0]).month(+m.split('-')[1] - 1).endOf('month').format('YYYY-MM-DD');
     loadRows(root, profile, start, end);
   });
-  root.querySelector('#btn-export').addEventListener('click', () => exportExcel(root));
+  root.querySelector('#btn-export').addEventListener('click', () => exportExcel(root, labels));
 }
 
 async function loadFilters(root, profile) {
@@ -84,10 +86,10 @@ async function loadRows(root, profile, start, end) {
   root._attRows = data;
 }
 
-function exportExcel(root) {
+function exportExcel(root, labels = { site: '현장' }) {
   const rows = root._attRows;
   if (!rows || !rows.length) { toast('내보낼 데이터가 없습니다', 'warn'); return; }
-  const aoa = [['근무일', '이름', '매장', '시프트', '출근', '퇴근', '근무시간(분)', '메모']];
+  const aoa = [['근무일', '이름', labels.site, '시프트', '출근', '퇴근', '근무시간(분)', '메모']];
   for (const r of rows) {
     aoa.push([
       r.workday,

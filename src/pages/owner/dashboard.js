@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase.js';
 import { requireRole, signOut } from '../../lib/auth.js';
 import { toast } from '../../lib/toast.js';
 import { initOfflineBar } from '../../lib/network.js';
+import { getLabels, canAccess, PAID_FEATURES } from '../../lib/labels.js';
 import { renderOverview } from './views/overview.js';
 import { renderAttendance } from './views/attendance.js';
 import { renderEmployees } from './views/employees.js';
@@ -36,6 +37,23 @@ async function init() {
   $('#biz-name').textContent = profile.tenants?.name || '사업장';
   $('#owner-name').textContent = profile.name;
 
+  // 아바타 이니셜
+  const av = $('#owner-avatar');
+  if (av && profile.name) av.textContent = profile.name.charAt(0);
+
+  // 업종 레이블 반영
+  const industryType = profile.tenants?.industry_type || '청소·시설관리';
+  const labels = getLabels(industryType);
+  const industryEl = $('#owner-industry');
+  if (industryEl) industryEl.textContent = industryType;
+  const navWorkers = $('#nav-workers');
+  if (navWorkers) navWorkers.textContent = labels.workers;
+  const navSites = $('#nav-sites');
+  if (navSites) navSites.textContent = `${labels.site} / QR`;
+
+  // 유료 기능 잠금 표시
+  applyFeatureLock(profile.tenants);
+
   initOfflineBar();
   showTrialBadge(profile.tenants);
 
@@ -57,6 +75,36 @@ function isExpired(t) {
     return t.trial_ends_at && new Date(t.trial_ends_at) < new Date();
   }
   return t.subscription_status === 'expired' || t.subscription_status === 'canceled';
+}
+
+function showUpgradePrompt(route) {
+  const featureName = PAID_FEATURES[route] || route;
+  const empCount = profile.tenants?.peak_employee_count || 0;
+  const fee = empCount > 0
+    ? `직원 ${empCount}명 기준 월 ${(empCount * 5000).toLocaleString()}원`
+    : '직원 수 × 월 5,000원';
+
+  const existing = document.getElementById('upgrade-prompt');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'upgrade-prompt';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,41,66,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:6px;padding:36px 32px;max-width:400px;width:100%;border-left:5px solid var(--gold,#B8935A)">
+      <div style="font-size:12px;font-weight:700;color:#B8935A;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">유료 전용 기능</div>
+      <h2 style="font-size:19px;font-weight:900;color:#0F2942;margin-bottom:10px">${featureName}</h2>
+      <p style="font-size:14px;color:#8a94a6;line-height:1.7;margin-bottom:6px">체험 기간이 만료되어 이 기능을 사용하려면 구독이 필요합니다.</p>
+      <p style="font-size:14px;color:#0F2942;font-weight:700;margin-bottom:24px">${fee}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button id="up-go-pay" style="padding:12px;background:#0F2942;color:#fff;border:none;border-radius:4px;font-size:14px;font-weight:700;cursor:pointer">구독 시작</button>
+        <button id="up-cancel" style="padding:12px;background:#f4f6f9;color:#3d4a5c;border:1px solid #e2e7ef;border-radius:4px;font-size:14px;cursor:pointer">닫기</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#up-go-pay').addEventListener('click', () => { overlay.remove(); navigate('settings'); });
+  overlay.querySelector('#up-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 
 function showExpiredModal() {
@@ -131,10 +179,28 @@ function bindNav() {
   });
 }
 
+function applyFeatureLock(tenant) {
+  $$('[data-feature]').forEach(item => {
+    const feature = item.dataset.feature;
+    const ok = canAccess(tenant, feature);
+    item.classList.toggle('locked', !ok);
+    if (!ok) {
+      item.title = `유료 기능 — 구독 후 사용 가능`;
+    }
+  });
+}
+
 async function navigate(route, fromHash = false) {
   if (!ROUTES[route]) route = 'overview';
-  if (route === currentRoute && !fromHash) return; // 같은 페이지 중복 방지
-  if (isNavigating) return; // 로딩 중 중복 방지
+
+  // 무료/만료 상태에서 유료 기능 접근 차단
+  if (!canAccess(profile.tenants, route) && route !== 'overview') {
+    showUpgradePrompt(route);
+    return;
+  }
+
+  if (route === currentRoute && !fromHash) return;
+  if (isNavigating) return;
 
   isNavigating = true;
   currentRoute = route;

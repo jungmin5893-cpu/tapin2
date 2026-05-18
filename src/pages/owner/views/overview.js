@@ -1,8 +1,11 @@
 import { supabase } from '../../../lib/supabase.js';
 import { nowKst, fmtDate, kst, minutesToHm, diffMinutes } from '../../../lib/time.js';
 import { subscribePush, isPushSubscribed } from '../../../lib/push.js';
+import { getLabels } from '../../../lib/labels.js';
 
 export async function renderOverview({ root, profile }) {
+  const labels = getLabels(profile.tenants?.industry_type);
+
   root.innerHTML = `
     <div class="page-head">
       <h1>대시보드</h1>
@@ -13,14 +16,14 @@ export async function renderOverview({ root, profile }) {
       <div class="kpi-card"><div class="kpi-label">출근</div><div class="kpi-val" id="kpi-in">-</div><div class="kpi-foot">현재 근무중</div></div>
       <div class="kpi-card"><div class="kpi-label">오늘 완료</div><div class="kpi-val" id="kpi-done">-</div><div class="kpi-foot">출퇴근 완료</div></div>
       <div class="kpi-card"><div class="kpi-label">미출근</div><div class="kpi-val red" id="kpi-absent">-</div><div class="kpi-foot">시프트 있으나 미체크인</div></div>
-      <div class="kpi-card"><div class="kpi-label">활성 직원</div><div class="kpi-val" id="kpi-total">-</div><div class="kpi-foot">전체</div></div>
+      <div class="kpi-card"><div class="kpi-label">활성 ${labels.worker}</div><div class="kpi-val" id="kpi-total">-</div><div class="kpi-foot">전체</div></div>
     </div>
 
     <div class="card">
       <div class="card-head"><h2>실시간 출퇴근</h2><div class="card-sub">최근 24시간 기록</div></div>
       <div class="table-wrap">
         <table class="att-table">
-          <thead><tr><th>이름</th><th>매장</th><th>시프트</th><th>출근</th><th>퇴근</th><th>근무시간</th></tr></thead>
+          <thead><tr><th>이름</th><th>${labels.site}</th><th>시프트</th><th>출근</th><th>퇴근</th><th>근무시간</th></tr></thead>
           <tbody id="recent-att"><tr><td colspan="6" class="empty">불러오는 중…</td></tr></tbody>
         </table>
       </div>

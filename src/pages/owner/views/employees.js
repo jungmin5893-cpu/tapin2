@@ -1,5 +1,6 @@
 import { supabase } from '../../../lib/supabase.js';
 import { toast } from '../../../lib/toast.js';
+import { getLabels } from '../../../lib/labels.js';
 
 const MIN_HOURLY  = 10030;               // 2025년 최저시급 (원)
 const MIN_DAILY   = MIN_HOURLY * 8;      // 최저일급 (8h 기준)
@@ -12,16 +13,20 @@ const WAGE_META = {
 };
 
 export async function renderEmployees({ root, profile }) {
+  const labels = getLabels(profile.tenants?.industry_type);
+  const wLbl = labels.worker;   // 직원 / 근로자 / 인력
+  const sLbl = labels.site;     // 현장 / 파견처
+
   root.innerHTML = `
     <div class="page-head">
-      <h1>직원 관리</h1>
-      <div class="page-sub">전화번호와 6자리 가입 코드를 발급해 직원이 자기 폰으로 가입하게 합니다</div>
+      <h1>${wLbl} 관리</h1>
+      <div class="page-sub">전화번호와 6자리 가입 코드를 발급해 ${wLbl}이 자기 폰으로 가입하게 합니다</div>
     </div>
 
     <div class="card">
       <div class="card-head">
-        <h2>직원 초대</h2>
-        <div class="card-sub">신규 직원의 전화번호를 등록하면 가입 코드가 자동 생성됩니다</div>
+        <h2>${wLbl} 초대</h2>
+        <div class="card-sub">신규 ${wLbl}의 전화번호를 등록하면 가입 코드가 자동 생성됩니다</div>
       </div>
       <form id="form-invite" class="form-row">
         <input type="text" id="inv-name" placeholder="이름 (선택)" />
@@ -35,7 +40,7 @@ export async function renderEmployees({ root, profile }) {
       <div class="card-head"><h2>미사용 가입 코드</h2><div class="card-sub">7일 후 자동 만료</div></div>
       <div class="table-wrap">
         <table class="att-table">
-          <thead><tr><th>이름</th><th>전화번호</th><th>매장</th><th>코드</th><th>만료</th><th></th></tr></thead>
+          <thead><tr><th>이름</th><th>전화번호</th><th>${sLbl}</th><th>코드</th><th>만료</th><th></th></tr></thead>
           <tbody id="invites-rows"></tbody>
         </table>
       </div>
@@ -43,14 +48,14 @@ export async function renderEmployees({ root, profile }) {
 
     <div class="card">
       <div class="card-head">
-        <h2>활성 직원</h2>
-        <div class="card-sub">급여 방식(시급·일급·월급)·금액·공제 유형 수정 가능 · ⚠️ 최저임금 미만 경고</div>
+        <h2>활성 ${wLbl}</h2>
+        <div class="card-sub">급여 방식(시급·일급·월급)·금액·공제 유형 수정 가능 · 최저임금 미만 경고</div>
       </div>
       <div class="table-wrap">
         <table class="att-table">
           <thead>
             <tr>
-              <th>이름</th><th>전화번호</th><th>매장</th>
+              <th>이름</th><th>전화번호</th><th>${sLbl}</th>
               <th>급여 방식</th><th>금액</th>
               <th>직책</th><th>공제</th><th>활성</th><th></th>
             </tr>
@@ -61,6 +66,7 @@ export async function renderEmployees({ root, profile }) {
     </div>
   `;
 
+  root._siteLbl = sLbl; // 내부 함수에서 참조
   await loadStores(root, profile);
   await loadInvites(root, profile);
   await loadEmployees(root, profile);
@@ -96,7 +102,9 @@ async function loadStores(root, profile) {
     .eq('tenant_id', profile.tenant_id).order('name');
   const sel = root.querySelector('#inv-store');
   if (!sel) return;
-  sel.innerHTML = '<option value="">매장 미지정</option>';
+  // siteLbl: loadStores는 내부 함수라 root에 저장된 값 사용
+  const siteLbl = root._siteLbl || '현장';
+  sel.innerHTML = `<option value="">${siteLbl} 미지정</option>`;
   for (const s of data || []) sel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
 }
 
@@ -189,7 +197,7 @@ async function loadEmployees(root, profile) {
       <td>${r.phone || '-'}</td>
       <td>
         <select class="cell-edit" data-field="store_id" style="width:120px;font-size:12px">
-          <option value="" ${!r.store_id ? 'selected' : ''}>매장 미지정</option>
+          <option value="" ${!r.store_id ? 'selected' : ''}>${root._siteLbl || '현장'} 미지정</option>
           ${storeOptions}
         </select>
       </td>

@@ -254,19 +254,22 @@ $('#form-owner-signup')?.addEventListener('submit', async (e) => {
   try {
     const ownerName    = $('#owner-name').value.trim();
     const businessName = $('#biz-name').value.trim();
-    const businessType = $('#biz-type').value;
+    const industryType = $('#biz-type').value; // 새로운 업종 값
 
     // 이미 로그인된 상태(프로필 미완성)이면 bootstrap만
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       const { error } = await supabase.rpc('bootstrap_owner', {
         p_business_name: businessName,
-        p_business_type: businessType,
+        p_business_type: industryType,
         p_owner_name: ownerName,
       });
       if (error && error.message !== 'ALREADY_BOOTSTRAPPED') throw error;
+      // industry_type 별도 업데이트 (bootstrap_owner가 business_type만 저장하므로)
+      await supabase.from('tenants').update({ industry_type: industryType })
+        .eq('id', (await supabase.auth.getUser()).data.user?.id);
       await supabase.auth.refreshSession();
-      toast('가입 완료! 무료체험 7일이 시작됩니다.', 'success');
+      toast('가입 완료! 30일 무료체험이 시작됩니다.', 'success');
       location.href = 'dashboard.html';
       return;
     }
@@ -278,7 +281,7 @@ $('#form-owner-signup')?.addEventListener('submit', async (e) => {
     if (password.length < 8) throw new Error('비밀번호는 8자 이상이어야 합니다');
     if (password !== confirm) throw new Error('비밀번호가 일치하지 않습니다');
 
-    const res = await signUpOwner({ email, password, businessName, businessType, ownerName });
+    const res = await signUpOwner({ email, password, businessName, businessType: industryType, ownerName });
     if (res.needsEmailConfirm) {
       toast('이메일로 확인 링크를 보냈습니다. 확인 후 로그인해주세요.', 'info', 4500);
       showPanel('ownerLogin');

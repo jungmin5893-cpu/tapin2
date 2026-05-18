@@ -213,18 +213,19 @@ body{
           <input type="text" id="owner-name" required placeholder="홍길동">
         </div>
         <div class="form-group">
-          <label>사업장 이름</label>
-          <input type="text" id="biz-name" required placeholder="태긴 카페">
+          <label>업체명 (사업장 이름)</label>
+          <input type="text" id="biz-name" required placeholder="예: (주)한국종합시설관리">
         </div>
         <div class="form-group">
-          <label>업종</label>
+          <label>사업 유형 <span style="color:var(--red)">*</span></label>
           <select id="biz-type" required>
-            <option value="office">사무직 (09~18시 위주)</option>
-            <option value="retail">매장/요식업 (오전/오후 교대)</option>
-            <option value="field">현장/경비 (야간 포함)</option>
-            <option value="small">소규모/기타</option>
+            <option value="청소·시설관리">청소·시설관리 업체</option>
+            <option value="경비·보안">경비·보안 업체</option>
+            <option value="인력사무소">인력사무소·직업소개소</option>
+            <option value="건설도급사">건설 전문 도급사 (설비·전기·소방·통신)</option>
+            <option value="기타">기타 다현장 운영 회사</option>
           </select>
-          <div class="hint">업종에 맞는 기본 시프트 프리셋이 자동 생성됩니다. 추후 변경 가능.</div>
+          <div class="hint">선택 후 현장·직원 등 용어와 메뉴가 맞춤 표시됩니다.</div>
         </div>
         <div class="form-group">
           <label>이메일</label>

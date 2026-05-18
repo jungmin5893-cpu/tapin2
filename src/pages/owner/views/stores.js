@@ -1,17 +1,22 @@
 import { supabase } from '../../../lib/supabase.js';
 import { toast } from '../../../lib/toast.js';
+import { getLabels } from '../../../lib/labels.js';
 
 export async function renderStores({ root, profile }) {
+  const labels = getLabels(profile.tenants?.industry_type);
+  const siteLbl = labels.site;       // 현장 / 파견처 / 매장 등
+  const siteAddLbl = labels.siteAdd; // 현장 추가 / 파견처 추가 등
+
   root.innerHTML = `
     <div class="page-head">
-      <h1>매장 관리</h1>
-      <div class="page-sub">매장별 QR 코드, 위치, 출퇴근 규칙</div>
+      <h1>${siteLbl} 관리</h1>
+      <div class="page-sub">${siteLbl}별 QR 코드, 위치, 출퇴근 규칙</div>
     </div>
     <div class="card">
-      <div class="card-head"><h2>새 매장 추가</h2></div>
+      <div class="card-head"><h2>${siteAddLbl}</h2></div>
       <form id="form-store" style="display:flex;flex-direction:column;gap:10px">
         <div style="display:flex;gap:8px">
-          <input type="text" id="st-name" placeholder="매장 이름" required style="flex:1">
+          <input type="text" id="st-name" placeholder="${siteLbl} 이름" required style="flex:1">
           <input type="number" id="st-radius" placeholder="반경(m)" value="100" style="width:100px">
         </div>
         <div style="display:flex;gap:8px">
@@ -30,7 +35,7 @@ export async function renderStores({ root, profile }) {
     <div id="stores-list"></div>
   `;
 
-  await loadStores(root, profile);
+  await loadStores(root, profile, siteLbl);
 
   root.querySelector('#btn-addr-search').addEventListener('click', () => openPostcode(root));
   root.querySelector('#st-addr').addEventListener('click', () => openPostcode(root));
@@ -46,10 +51,10 @@ export async function renderStores({ root, profile }) {
     };
     const { error } = await supabase.from('stores').insert(row);
     if (error) { toast(error.message, 'error'); return; }
-    toast('매장 추가 완료', 'success');
+    toast(`${siteLbl} 추가 완료`, 'success');
     e.target.reset();
     root.querySelector('#st-map-preview').style.display = 'none';
-    await loadStores(root, profile);
+    await loadStores(root, profile, siteLbl);
   });
 }
 
@@ -135,10 +140,10 @@ function loadCss(href) {
   });
 }
 
-async function loadStores(root, profile) {
+async function loadStores(root, profile, siteLbl = '현장') {
   const { data } = await supabase.from('stores').select('*').eq('tenant_id', profile.tenant_id).order('name');
   const list = root.querySelector('#stores-list');
-  if (!data?.length) { list.innerHTML = '<div class="card"><div class="empty-state">아직 매장이 없습니다</div></div>'; return; }
+  if (!data?.length) { list.innerHTML = `<div class="card"><div class="empty-state">아직 등록된 ${siteLbl}이 없습니다</div></div>`; return; }
   list.innerHTML = data.map(s => `
     <div class="card store-card" data-id="${s.id}">
       <div class="store-head">
@@ -172,14 +177,14 @@ async function loadStores(root, profile) {
     const newSecret = crypto.randomUUID().replace(/-/g, '');
     const { error } = await supabase.from('stores').update({ qr_secret: newSecret }).eq('id', b.dataset.regen);
     if (error) toast(error.message, 'error');
-    else { toast('QR 재발급 완료', 'success'); await loadStores(root, profile); }
+    else { toast('QR 재발급 완료', 'success'); await loadStores(root, profile, siteLbl); }
   }));
 
   list.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('이 매장을 삭제하면 관련 출퇴근 기록도 함께 삭제됩니다. 계속할까요?')) return;
+    if (!confirm(`이 ${siteLbl}을 삭제하면 관련 출퇴근 기록도 함께 삭제됩니다. 계속할까요?`)) return;
     const { error } = await supabase.from('stores').delete().eq('id', b.dataset.del);
     if (error) toast(error.message, 'error');
-    else { toast('삭제됨', 'success'); await loadStores(root, profile); }
+    else { toast('삭제됨', 'success'); await loadStores(root, profile, siteLbl); }
   }));
 
   list.querySelectorAll('[data-download]').forEach(b => b.addEventListener('click', () => downloadQr(root, b.dataset.download)));
