@@ -4,15 +4,6 @@ import { toast } from '../../../lib/toast.js';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-const DAYS = [
-  { key: 'mon', label: '월' },
-  { key: 'tue', label: '화' },
-  { key: 'wed', label: '수' },
-  { key: 'thu', label: '목' },
-  { key: 'fri', label: '금' },
-  { key: 'sat', label: '토' },
-  { key: 'sun', label: '일' },
-];
 
 export async function renderMessages({ root, profile }) {
   root.innerHTML = `
@@ -52,18 +43,11 @@ export async function renderMessages({ root, profile }) {
           </div>
         </div>
         <div>
-          <label style="font-size:12px;font-weight:700;color:#3d4a5c;display:block;margin-bottom:8px">
-            요일 예약 <span style="font-weight:400;color:#8a94a6">(선택 안 하면 매일 활성)</span>
+          <label style="font-size:12px;font-weight:700;color:#3d4a5c;display:block;margin-bottom:5px">
+            발송 예약일 <span style="font-weight:400;color:#8a94a6">(선택 안 하면 즉시 발송)</span>
           </label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${DAYS.map(d => `
-              <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
-                <input type="checkbox" class="day-check" value="${d.key}"
-                  style="width:18px;height:18px;accent-color:#00c9a7">
-                <span style="font-size:12px;font-weight:700;color:#3d4a5c">${d.label}</span>
-              </label>
-            `).join('')}
-          </div>
+          <input id="msg-date" type="date"
+            style="width:100%;padding:10px 12px;border:1.5px solid #e2e7ef;border-radius:8px;font-size:14px;font-family:inherit">
         </div>
         <button type="submit" class="btn"
           style="background:linear-gradient(135deg,#00c9a7,#00b096);color:#fff;border:none;padding:12px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">
@@ -132,7 +116,7 @@ export async function renderMessages({ root, profile }) {
 
     const title = $('#msg-title', root).value.trim();
     const body  = $('#msg-body', root).value.trim();
-    const days  = $$('.day-check:checked', root).map(c => c.value);
+    const scheduledDate = $('#msg-date', root).value || null;
     const targetId = $('#target-select', root).value;
 
     if (targetType !== 'all' && !targetId) {
@@ -148,7 +132,7 @@ export async function renderMessages({ root, profile }) {
       target_type: targetType,
       target_store_id:    targetType === 'store'    ? targetId : null,
       target_employee_id: targetType === 'employee' ? targetId : null,
-      scheduled_days: days.length > 0 ? days : null,
+      scheduled_date: scheduledDate,
       active: true,
       created_by: profile.id,
     };
@@ -193,9 +177,9 @@ export async function renderMessages({ root, profile }) {
       const targetLabel =
         m.target_type === 'all'      ? '전체 직원' :
         m.target_type === 'store'    ? '현장별' : '개별 직원';
-      const daysLabel = m.scheduled_days?.length
-        ? m.scheduled_days.map(d => DAYS.find(x => x.key === d)?.label || d).join('·') + '요일'
-        : '매일';
+      const daysLabel = m.scheduled_date
+        ? `${m.scheduled_date} 발송예약`
+        : '즉시 발송';
       const statusColor = m.active ? '#00c9a7' : '#8a94a6';
       const statusLabel = m.active ? '활성' : '비활성';
 
