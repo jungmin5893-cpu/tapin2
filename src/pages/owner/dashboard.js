@@ -168,10 +168,25 @@ function showExpiredModal() {
 
   document.getElementById('btn-go-billing').addEventListener('click', () => {
     overlay.remove();
-    bindNav();
+    if (!document.querySelector('.nav-item[data-route]')?._hasListener) bindNav();
     navigate('settings');
   });
-  document.getElementById('btn-expired-refresh').addEventListener('click', () => location.reload());
+  document.getElementById('btn-expired-refresh').addEventListener('click', async () => {
+    // 프로필 재로드 후 만료 여부 재확인
+    const { getMyProfile } = await import('../../lib/auth.js');
+    const fresh = await getMyProfile();
+    if (fresh?.tenants) {
+      profile.tenants = fresh.tenants;
+      if (!isExpired(fresh.tenants)) {
+        overlay.remove();
+        showTrialBadge(fresh.tenants);
+        bindNav();
+        navigate('overview');
+        return;
+      }
+    }
+    location.reload();
+  });
   document.getElementById('btn-expired-logout').addEventListener('click', signOut);
 }
 
@@ -242,8 +257,10 @@ async function navigate(route, fromHash = false) {
     return;
   }
 
-  // 무료/만료 상태에서 유료 기능 접근 차단 (슈퍼어드민 패널은 제외)
-  if (route !== 'superadmin' && !canAccess(profile.tenants, route) && route !== 'overview') {
+  // 무료/만료 상태에서 유료 기능 접근 차단
+  // settings·superadmin·overview는 항상 접근 허용 (결제 및 어드민 기능)
+  const ALWAYS_OPEN = ['overview', 'settings', 'superadmin'];
+  if (!ALWAYS_OPEN.includes(route) && !canAccess(profile.tenants, route)) {
     showUpgradePrompt(route);
     return;
   }
