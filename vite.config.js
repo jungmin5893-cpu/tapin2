@@ -5,7 +5,7 @@ import { resolve } from 'path';
 export default defineConfig({
   root: '.',
   publicDir: 'public',
-  base: '/scandgo/',
+  base: '/',
   build: {
     outDir: 'dist',
     rollupOptions: {
