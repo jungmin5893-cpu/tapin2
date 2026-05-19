@@ -305,6 +305,29 @@ select.cell-edit{cursor:pointer;}
   .store-head{flex-wrap:wrap;gap:8px;}
   .store-body{padding:14px;}
   .shift-pill{font-size:12px;padding:6px 10px;margin:4px;}
+
+  /* ── 스케줄 캘린더 모바일 최적화 ── */
+  /* 직원 이름 열 너비 축소: 160px → 88px */
+  .cal-grid .emp-col{width:88px;min-width:88px;max-width:88px;padding:8px 8px;font-size:12px;}
+  .cal-grid th.emp-col{font-size:10px;}
+  /* 날짜 셀 높이·폰트 축소 */
+  .cal-grid td{height:54px;padding:4px;}
+  .cal-grid th{padding:8px 4px;}
+  .cal-grid th .d-num{font-size:15px;}
+  .cal-grid th.today-col .d-num{width:26px;height:26px;line-height:26px;}
+  .cal-grid th .d-dow{font-size:10px;margin-top:2px;}
+  /* 시프트 뱃지 축소 */
+  .cal-shift{font-size:11px;padding:4px 6px;border-width:1.5px;}
+  .cal-off{font-size:11px;padding:4px 6px;}
+  .cal-empty{font-size:16px;}
+  /* 월간 뷰 직원 열 */
+  .cal-grid.monthly .emp-col{min-width:80px;width:80px;max-width:80px;padding:6px 8px;}
+
+  /* ── 가로 스크롤 시각적 힌트 (오른쪽 페이드) ── */
+  .cal-scroll-wrap{position:relative;}
+  .cal-scroll-wrap::after{content:'';position:absolute;right:0;top:0;bottom:0;width:28px;background:linear-gradient(to right,transparent,rgba(255,255,255,.85));pointer-events:none;border-radius:0 8px 8px 0;}
+  .table-wrap{position:relative;}
+  .table-wrap::after{content:'';position:absolute;right:0;top:0;bottom:0;width:28px;background:linear-gradient(to right,transparent,rgba(255,255,255,.85));pointer-events:none;}
 }
 
 @media (max-width: 400px) {
