@@ -444,7 +444,7 @@ async function finish(){
       if(user){
         await supabase.from('profiles')
           .update({ tutorial_employee_done: true })
-          .eq('user_id', user.id);
+          .eq('id', user.id);
       }
     } catch(e){ console.warn('튜토리얼 완료 저장 실패', e); }
   }
