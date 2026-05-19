@@ -204,8 +204,20 @@ async function loadMonthSummary() {
   }
   $('#m-days').textContent = days.size;
   $('#m-hours').textContent = Math.floor(minutes / 60);
-  const wage = profile.hourly_wage || 10030;
-  $('#m-pay').textContent = Math.floor((minutes / 60) * wage).toLocaleString();
+
+  // 급여방식별 예상 세전 계산
+  const wage     = profile.hourly_wage || 10030;
+  const wageType = profile.wage_type   || 'hourly';
+  let gross = 0;
+  if      (wageType === 'monthly') gross = wage;
+  else if (wageType === 'daily')   gross = wage * days.size;
+  else                              gross = Math.floor((minutes / 60) * wage);
+
+  // 공제 적용
+  const RATE = { insurance: 0.094, freelancer: 0.033, none: 0 };
+  const rate = RATE[profile.deduction_type] ?? 0.094;
+  const net  = Math.round(gross * (1 - rate));
+  $('#m-pay').textContent = net.toLocaleString();
 }
 
 // ---------- QR 스캔 ----------
@@ -644,28 +656,86 @@ async function openContractDetail(id) {
 }
 
 async function loadSalary() {
-  const period = nowKst().startOf('month').format('YYYY-MM-DD');
-  const { data, error } = await supabase
+  const monthStart = nowKst().startOf('month').format('YYYY-MM-DD');
+  const monthEnd   = nowKst().endOf('month').format('YYYY-MM-DD');
+  const period     = monthStart;
+
+  const RATE  = { insurance: 0.094, freelancer: 0.033, none: 0 };
+  const RLBL  = { insurance: '4대보험 공제 (9.4%)', freelancer: '원천징수 (3.3%)', none: '공제 없음' };
+  const WLBL  = { hourly: '시급제', daily: '일급제', monthly: '월급제' };
+
+  const wage         = profile.hourly_wage    || 10030;
+  const wageType     = profile.wage_type      || 'hourly';
+  const deductionType= profile.deduction_type || 'insurance';
+  const rate         = RATE[deductionType] ?? 0.094;
+
+  // 사장님이 정산을 이미 완료한 경우 — payrolls 우선
+  const { data: payroll } = await supabase
     .from('payrolls')
     .select('*')
     .eq('employee_id', profile.id)
     .eq('period', period)
     .maybeSingle();
-  if (error && error.code !== 'PGRST116') console.warn(error);
 
-  if (!data) {
-    $('#sal-amount').textContent = '계산 전';
-    $('#sal-date').textContent = '월말 정산 시 자동 계산';
-    $('#sal-rows').innerHTML = '<div class="sal-row"><span>아직 명세가 없습니다</span><span></span></div>';
+  if (payroll) {
+    $('#sal-amount').textContent = `${payroll.net_pay.toLocaleString()}원`;
+    $('#sal-date').textContent   = '이번 달 정산 완료';
+    $('#sal-rows').innerHTML = `
+      <div class="sal-row"><span>기본급</span><span>${payroll.base_pay.toLocaleString()}원</span></div>
+      ${payroll.night_pay    > 0 ? `<div class="sal-row"><span>야간수당</span><span>+${payroll.night_pay.toLocaleString()}원</span></div>` : ''}
+      ${payroll.overtime_pay > 0 ? `<div class="sal-row"><span>연장수당</span><span>+${payroll.overtime_pay.toLocaleString()}원</span></div>` : ''}
+      ${payroll.deductions   > 0 ? `<div class="sal-row deduct"><span>${RLBL[deductionType]}</span><span>-${payroll.deductions.toLocaleString()}원</span></div>` : ''}
+      <div class="sal-row total"><span>실수령</span><span><strong>${payroll.net_pay.toLocaleString()}원</strong></span></div>
+    `;
     return;
   }
-  $('#sal-amount').textContent = `${data.net_pay.toLocaleString()}원`;
-  $('#sal-date').textContent = `${fmtDate(period)} 기준`;
+
+  // 정산 전 — 실시간 근무 데이터로 예상액 계산
+  const { data: atts } = await supabase
+    .from('attendances')
+    .select('check_in_at, check_out_at, workday')
+    .eq('employee_id', profile.id)
+    .gte('workday', monthStart)
+    .lte('workday', monthEnd);
+
+  const days = new Set((atts || []).map(a => a.workday));
+  let minutes = 0;
+  for (const r of atts || []) {
+    if (r.check_out_at) minutes += diffMinutes(r.check_in_at, r.check_out_at);
+  }
+
+  let gross = 0;
+  let breakdown = '';
+
+  if (wageType === 'monthly') {
+    gross = wage;
+    breakdown = `
+      <div class="sal-row"><span>월급 (고정)</span><span>${wage.toLocaleString()}원</span></div>`;
+  } else if (wageType === 'daily') {
+    gross = wage * days.size;
+    breakdown = `
+      <div class="sal-row"><span>일급</span><span>${wage.toLocaleString()}원</span></div>
+      <div class="sal-row"><span>근무일수</span><span>${days.size}일</span></div>
+      <div class="sal-row"><span>소계</span><span>${gross.toLocaleString()}원</span></div>`;
+  } else {
+    gross = Math.floor((minutes / 60) * wage);
+    const h = Math.floor(minutes / 60), m = minutes % 60;
+    breakdown = `
+      <div class="sal-row"><span>시급</span><span>${wage.toLocaleString()}원/h</span></div>
+      <div class="sal-row"><span>총 근무</span><span>${h}시간 ${m}분</span></div>
+      <div class="sal-row"><span>소계</span><span>${gross.toLocaleString()}원</span></div>`;
+  }
+
+  const deductions = Math.round(gross * rate);
+  const net        = gross - deductions;
+
+  $('#sal-amount').textContent = `${net.toLocaleString()}원`;
+  $('#sal-date').textContent   = `예상 실수령 · ${WLBL[wageType]} (정산 전)`;
   $('#sal-rows').innerHTML = `
-    <div class="sal-row"><span>기본급</span><span>${data.base_pay.toLocaleString()}원</span></div>
-    <div class="sal-row"><span>야간수당</span><span>${data.night_pay.toLocaleString()}원</span></div>
-    <div class="sal-row"><span>연장근무</span><span>${data.overtime_pay.toLocaleString()}원</span></div>
-    <div class="sal-row deduct"><span>공제</span><span>-${data.deductions.toLocaleString()}원</span></div>
-    <div class="sal-row"><span>실수령</span><span>${data.net_pay.toLocaleString()}원</span></div>
+    ${breakdown}
+    ${deductions > 0
+      ? `<div class="sal-row deduct"><span>${RLBL[deductionType]}</span><span>-${deductions.toLocaleString()}원</span></div>`
+      : `<div class="sal-row"><span>${RLBL[deductionType]}</span><span>없음</span></div>`}
+    <div class="sal-row total"><span>예상 실수령</span><span><strong>${net.toLocaleString()}원</strong></span></div>
   `;
 }
