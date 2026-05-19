@@ -286,11 +286,11 @@ async function handleQrPayload(raw) {
       const dist = gpsDistance(lat, lng, storeData.gps_lat, storeData.gps_lng);
       const radius = storeData.gps_radius_m || 100;
       if (dist > radius) {
-        const ok = confirm(
-          `📍 현재 위치가 매장(${storeData.name || ''})에서 약 ${Math.round(dist)}m 떨어져 있습니다.\n` +
-          `허용 반경: ${radius}m\n\n그래도 출퇴근 처리할까요?`
+        toast(
+          `📍 출퇴근 불가 — 현재 위치가 매장에서 ${Math.round(dist)}m 떨어져 있습니다 (허용 ${radius}m 이내). 매장 안에서 다시 시도해주세요.`,
+          'error', 6000
         );
-        if (!ok) return;
+        return;
       }
     }
   } catch (gpsErr) {

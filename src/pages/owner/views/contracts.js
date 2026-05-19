@@ -114,6 +114,15 @@ export async function renderContracts({ root, profile }) {
   root.querySelector('#contract-modal').addEventListener('click', e => {
     if (e.target === root.querySelector('#contract-modal')) closeModal(root);
   });
+
+  // ── 실시간 구독: 직원 서명 시 목록 자동 갱신 ─────────────
+  const channel = supabase.channel('owner-contracts-realtime')
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'labor_contracts',
+      filter: `tenant_id=eq.${profile.tenant_id}`,
+    }, () => loadContracts(root, profile))
+    .subscribe();
+  root._teardown = () => supabase.removeChannel(channel);
 }
 
 // ── 직원 필터 ─────────────────────────────────────────────────────────────────

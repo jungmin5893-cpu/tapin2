@@ -41,6 +41,20 @@ export async function renderAttendance({ root, profile }) {
     loadRows(root, profile, start, end);
   });
   root.querySelector('#btn-export').addEventListener('click', () => exportExcel(root, labels));
+
+  // ── 실시간 구독: 직원 출퇴근 시 자동 갱신 ──────────────
+  const channel = supabase.channel('owner-att-realtime')
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'attendances',
+      filter: `tenant_id=eq.${profile.tenant_id}`,
+    }, () => {
+      const m = root.querySelector('#att-month')?.value || nowKst().format('YYYY-MM');
+      const start = `${m}-01`;
+      const end = nowKst().year(+m.split('-')[0]).month(+m.split('-')[1] - 1).endOf('month').format('YYYY-MM-DD');
+      loadRows(root, profile, start, end);
+    })
+    .subscribe();
+  root._teardown = () => supabase.removeChannel(channel);
 }
 
 async function loadFilters(root, profile) {

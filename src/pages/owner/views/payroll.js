@@ -279,23 +279,65 @@ function calcNightMinutes(inT, outT) {
 }
 
 function exportExcel(root) {
-  const rows = root._payRows;
+  const rows = root._displayRows;
   if (!rows?.length) { toast('내보낼 데이터가 없습니다', 'warn'); return; }
+
+  const wageLabel = { hourly: '시급제', daily: '일급제', monthly: '월급제' };
+  const dedLabel  = { insurance: '4대보험 9.4%', freelancer: '프리랜서 3.3%', none: '없음' };
+
+  // 헤더
   const aoa = [[
-    '직원ID', '기간', '급여방식', '총분', '기본급',
-    '야간수당', '연장수당', '주휴수당', '공제', '실수령',
+    '직원명', '급여방식', '공제유형', '근무일수', '총 근무시간',
+    '기본급', '야간수당', '연장수당', '주휴수당',
+    '지급합계(세전)', '공제액', '실수령액',
   ]];
+
   for (const r of rows) {
     aoa.push([
-      r.employee_id, r.period, r.wage_type || '-',
-      r.total_minutes, r.base_pay,
-      r.night_pay, r.overtime_pay,
-      r.holiday_pay || 0, r.deductions, r.net_pay,
+      r.name,
+      wageLabel[r.wageType]  || r.wageType,
+      dedLabel[r.deductionType] || r.deductionType,
+      r.daysWorked,
+      minutesToHm(r.totalMin),
+      r.basePay,
+      r.nightPay,
+      r.otPay,
+      r.holidayPay,
+      r.grossPay,
+      r.deductions,
+      r.net,
     ]);
   }
+
+  // 합계 행
+  const sum = (key) => rows.reduce((a, r) => a + (r[key] || 0), 0);
+  aoa.push([
+    '합계', '', '', rows.reduce((a, r) => a + r.daysWorked, 0), '',
+    sum('basePay'), sum('nightPay'), sum('otPay'), sum('holidayPay'),
+    sum('grossPay'), sum('deductions'), sum('net'),
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // 열 너비
+  ws['!cols'] = [
+    { wch: 12 }, { wch: 9 }, { wch: 16 }, { wch: 8 }, { wch: 11 },
+    { wch: 13 }, { wch: 11 }, { wch: 11 }, { wch: 11 },
+    { wch: 14 }, { wch: 11 }, { wch: 13 },
+  ];
+
+  // 금액 셀(F~L, 인덱스 5~11) 숫자 포맷 #,##0
+  for (let ri = 1; ri < aoa.length; ri++) {
+    for (let ci = 5; ci <= 11; ci++) {
+      const addr = XLSX.utils.encode_cell({ r: ri, c: ci });
+      if (ws[addr] && typeof ws[addr].v === 'number') ws[addr].z = '#,##0';
+    }
+  }
+
+  const monthStr = root.querySelector('#pay-month')?.value || nowKst().format('YYYY-MM');
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '급여');
-  XLSX.writeFile(wb, `TAGIN_급여_${rows[0].period.slice(0, 7)}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, `${monthStr} 급여정산`);
+  XLSX.writeFile(wb, `TAGIN_급여정산_${monthStr}.xlsx`);
   toast('엑셀 다운로드 완료', 'success');
 }
 

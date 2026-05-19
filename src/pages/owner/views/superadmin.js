@@ -17,25 +17,16 @@ export async function renderSuperAdmin({ root }) {
 }
 
 async function loadTenants(root) {
-  const [{ data: tenants, error: te }, { data: owners }] = await Promise.all([
-    supabase.from('tenants')
-      .select('id, name, industry_type, subscription_status, trial_ends_at, peak_employee_count, created_at, plan')
-      .order('created_at', { ascending: false }),
-    supabase.from('profiles')
-      .select('tenant_id, name, email')
-      .eq('role', 'owner'),
-  ]);
+  // RPC 함수로 RLS 우회 — 슈퍼어드민 전용
+  const { data, error } = await supabase.rpc('get_all_tenants_admin');
 
-  if (te) {
-    root.querySelector('#sa-list').innerHTML = `<div class="error-box">조회 실패: ${te.message}</div>`;
+  if (error) {
+    root.querySelector('#sa-list').innerHTML = `<div class="error-box">조회 실패: ${error.message}</div>`;
     return;
   }
 
-  const ownerMap = {};
-  for (const o of owners || []) ownerMap[o.tenant_id] = o;
-
   const list = root.querySelector('#sa-list');
-  if (!tenants?.length) {
+  if (!data?.length) {
     list.innerHTML = '<div class="card"><div class="empty-state">가입자가 없습니다</div></div>';
     return;
   }
@@ -43,7 +34,7 @@ async function loadTenants(root) {
   list.innerHTML = `
     <div class="card">
       <div class="card-head">
-        <h2>전체 가입자 (${tenants.length}개 사업장)</h2>
+        <h2>전체 가입자 (${data.length}개 사업장)</h2>
         <div class="card-sub">트라이얼 연장 / 상태 변경</div>
       </div>
       <div class="table-wrap">
@@ -61,7 +52,7 @@ async function loadTenants(root) {
             </tr>
           </thead>
           <tbody>
-            ${tenants.map(t => renderRow(t, ownerMap[t.id])).join('')}
+            ${data.map(t => renderRow(t)).join('')}
           </tbody>
         </table>
       </div>
@@ -76,7 +67,7 @@ async function loadTenants(root) {
   });
 }
 
-function renderRow(t, owner) {
+function renderRow(t) {
   const endDate = t.trial_ends_at ? new Date(t.trial_ends_at) : null;
   const daysLeft = endDate ? Math.ceil((endDate - Date.now()) / 86400000) : null;
   const statusLabel = { trialing: '트라이얼', active: '구독중', past_due: '결제실패', canceled: '해지', expired: '만료' };
@@ -98,8 +89,8 @@ function renderRow(t, owner) {
     <tr>
       <td style="font-weight:700">${t.name || '(미설정)'}</td>
       <td>
-        <div style="font-size:13px">${owner?.name || '—'}</div>
-        <div style="font-size:11px;color:#64748b">${owner?.email || '—'}</div>
+        <div style="font-size:13px">${t.owner_name || '—'}</div>
+        <div style="font-size:11px;color:#64748b">${t.owner_email || '—'}</div>
       </td>
       <td style="font-size:12px;color:#8a94a6">${t.industry_type || '—'}</td>
       <td><span class="sub-status ${statusClass[t.subscription_status] || ''}" style="font-weight:700;font-size:13px">${statusLabel[t.subscription_status] || t.subscription_status}</span></td>
